@@ -5,7 +5,7 @@ FOR Note! = 0 TO 12
     BEEP .08, Note!
 NEXT Note!
 
-PRINT "GW-BASIC SOUND: frequency sweep in background"
+PRINT "GW-BASIC SOUND: queued monophonic frequency sweep"
 FOR Frequency! = 220 TO 880 STEP 55
     SOUND Frequency!, 1
 NEXT Frequency!

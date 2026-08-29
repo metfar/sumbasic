@@ -22,6 +22,7 @@
 import io;
 import math;
 import os;
+import queue;
 import shutil;
 import struct;
 import subprocess;
@@ -41,30 +42,69 @@ def spectrum_pitch_frequency(pitch):
     return MIDDLE_C_HZ * (2.0 ** (float(pitch) / 12.0));
 
 
+def spectrum_frequency_pitch(frequency):
+    frequency = float(frequency);
+    if frequency <= 0.0:
+        raise ValueError("frequency must be positive");
+    return 12.0 * math.log2(frequency / MIDDLE_C_HZ);
+
+
 def gw_ticks_to_seconds(ticks):
     return float(ticks) / GW_BASIC_TICKS_PER_SECOND;
 
 
 class SystemTonePlayer:
-    """Best-effort portable tone backend.
+    """Portable monophonic tone backend shared by BEEP and SOUND.
 
-    The BASIC semantics live in the interpreter.  This class only turns a
-    frequency/duration pair into sound.  `blocking=False` dispatches a daemon
-    thread so GW-BASIC-style SOUND can continue program execution.
+    Both BASIC statements use exactly one tone renderer.  Requests are queued
+    through one worker so a PC-speaker-style channel can never play two notes
+    simultaneously.  A blocking request (Spectrum BEEP) waits for its queued
+    note to finish; a background request (GW-BASIC SOUND) returns immediately
+    while the same worker renders it in order.
     """
     def __init__(self, sample_rate=22050):
         self.sample_rate = max(8000, int(sample_rate));
+        self._tone_queue = queue.Queue();
+        self._worker = None;
+        self._worker_lock = threading.Lock();
+
+    def _ensure_worker(self):
+        with self._worker_lock:
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = threading.Thread(target=self._worker_loop, name="sumBASIC-tone", daemon=True);
+                self._worker.start();
+        return self._worker;
 
     def play(self, frequency, duration, blocking=True):
         frequency = float(frequency);
         duration = max(0.0, float(duration));
         if duration <= 0.0:
             return None;
-        if blocking:
-            return self._play_blocking(frequency, duration);
-        worker = threading.Thread(target=self._play_blocking, args=(frequency, duration), daemon=True);
-        worker.start();
-        return worker;
+        completed = threading.Event() if blocking else None;
+        result = [];
+        self._ensure_worker();
+        self._tone_queue.put((frequency, duration, completed, result));
+        if completed is not None:
+            completed.wait();
+            return result[0] if result else False;
+        return None;
+
+    def wait_for_background(self):
+        """Wait until all queued SOUND requests have finished playing."""
+        self._tone_queue.join();
+        return None;
+
+    def _worker_loop(self):
+        while True:
+            frequency, duration, completed, result = self._tone_queue.get();
+            try:
+                result.append(self._play_blocking(frequency, duration));
+            except Exception:
+                result.append(False);
+            finally:
+                if completed is not None:
+                    completed.set();
+                self._tone_queue.task_done();
 
     def _play_blocking(self, frequency, duration):
         if os.name == "nt":

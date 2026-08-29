@@ -2,7 +2,7 @@
 
 sumBASIC aims to make scalar mathematics a first-class teaching feature rather than inheriting the deliberately small numerical toolbox typical of xBase-family languages.
 
-This document describes the mathematical surface implemented in `0.1.0a6`. It does not claim that every field of mathematics is already built in: matrix algebra, statistics and symbolic algebra are separate future layers. Real, integer, decimal and complex arithmetic below are executable now.
+This document describes the mathematical surface implemented in `0.1.0a7`. It does not claim that every field of mathematics is already built in: matrix algebra, statistics and symbolic algebra are separate future layers. Real, integer, decimal and complex arithmetic below are executable now.
 
 ## Constants
 

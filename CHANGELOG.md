@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0a7
+
+- Fixed distorted/overlapping `SOUND` playback on POSIX systems by replacing one-thread-per-note playback with a single monophonic tone queue.
+- `SOUND frequency, ticks` now converts Hertz to the equivalent fractional Spectrum semitone and feeds the same tone generator used by `BEEP`, while preserving GW-BASIC parameter order and tick timing.
+- `BEEP` remains blocking; `SOUND` remains non-blocking, but queued SOUND notes now play sequentially instead of simultaneously.
+- Added `spectrum_frequency_pitch()` as the inverse of `spectrum_pitch_frequency()` and regression coverage for exact round-trip tuning.
+- Added backend regression coverage proving multiple background SOUND requests are serialized on one channel.
+- One-shot `--run` execution now lets queued final SOUND notes finish before the host process exits; SOUND remains non-blocking during BASIC execution.
+- No new ASC entries are required in this release.
+
+
 ## 0.1.0a6
 
 - Added a sumBASIC-aware source IDE based on sumTUI edit; `F5` runs the current editor buffer without forcing a save first and shows program output in an IDE output pane.

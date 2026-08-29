@@ -505,3 +505,32 @@ def test_ide_f5_runs_current_unsaved_editor_buffer(tmp_path):
     assert ide.output_view.text == 'unsaved';
     assert ide.editor.modified is True;
     assert path.read_text(encoding='utf-8') == 'PRINT "saved"\n';
+
+
+def test_sound_frequency_round_trips_through_spectrum_pitch_generator():
+    import math;
+    from sumbasic.audio import spectrum_frequency_pitch, spectrum_pitch_frequency;
+    for frequency in (37.0, 130.8127826502993, 261.6255653005986, 262.0, 440.0, 523.2511306011972, 32767.0):
+        pitch = spectrum_frequency_pitch(frequency);
+        rebuilt = spectrum_pitch_frequency(pitch);
+        assert math.isclose(rebuilt, frequency, rel_tol=1e-12, abs_tol=1e-9);
+
+
+def test_system_tone_player_serializes_background_sound_requests():
+    from sumbasic.audio import SystemTonePlayer;
+    events = [];
+    player = SystemTonePlayer();
+    def fake_play(frequency, duration):
+        events.append(("start", frequency));
+        events.append(("end", frequency));
+        return True;
+    player._play_blocking = fake_play;
+    player.play(220, .01, False);
+    player.play(330, .01, False);
+    player.play(440, .01, False);
+    player.wait_for_background();
+    assert events == [
+        ("start", 220.0), ("end", 220.0),
+        ("start", 330.0), ("end", 330.0),
+        ("start", 440.0), ("end", 440.0),
+    ];

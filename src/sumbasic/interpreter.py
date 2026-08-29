@@ -23,7 +23,7 @@ import re;
 import time;
 from pathlib import Path;
 
-from .audio import GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, SystemTonePlayer, gw_ticks_to_seconds, spectrum_pitch_frequency;
+from .audio import GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, SystemTonePlayer, gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency;
 from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
 from .expressions import ExpressionEvaluator;
@@ -623,7 +623,12 @@ class BasicInterpreter:
             if frequency < GW_BASIC_SOUND_MIN_HZ or frequency > GW_BASIC_SOUND_MAX_HZ:
                 raise BasicError("SOUND frequency must be between 37 and 32767 Hz");
             if ticks < 0: raise BasicError("SOUND duration must be non-negative");
-            self.tone_func(frequency, gw_ticks_to_seconds(ticks), False);
+            # SOUND speaks in Hertz, but the actual tone is rendered by the same
+            # fractional-semitone generator as BEEP.  The round trip is deliberate:
+            # it preserves SOUND syntax/units while keeping one monophonic backend.
+            pitch = spectrum_frequency_pitch(frequency);
+            tone_frequency = spectrum_pitch_frequency(pitch);
+            self.tone_func(tone_frequency, gw_ticks_to_seconds(ticks), False);
             return pc + 1;
         assignment = re.match(r"^(?:LET\s+)?(.+?)\s*=\s*(.+)$", text, re.I);
         if assignment:
