@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0a13
+
+- Documentation/example consistency pass: README now matches the implemented IDE convention (`F5` Run/Stop, `F6` Next Window), documents F5-after-`STOP` continuation correctly, points to the current ASC companion, and reports the current 65-test suite.
+- Updated `examples/stop_continue.bas` to show the IDE F5 continuation and console `CONTINUE`/`CONT` paths; `examples/retro_clock.bas` now states the current F5/F6 IDE keys.
+- Updated dependencies to `sumtui>=0.5.19` and `sumx>=0.1.8`.
+- No language semantics or ASC indices changed from 0.1.0a12.
+
 ## 0.1.0a12
 
 - IDE key convention changed to **F5 = Run/Stop toggle** and **F6 = switch editor/output window**. F6 is no longer consumed as an emergency stop key.

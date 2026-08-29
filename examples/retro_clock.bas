@@ -2,6 +2,7 @@
 # TIME$ supplies HH:MM:SS. TIMER is seconds since local midnight.
 # The bitmap font is loaded once from DATA into DIM SHARED arrays.
 # The clock runs until Escape, Q or q is pressed in the IDE or --run console.
+# IDE: F5 toggles Run/Stop; F6 changes between Editor and Output.
 
 DIM SHARED Font$(9, 6), Colon$(6)
 

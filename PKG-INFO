@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a12
+Version: 0.1.0a13
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,12 +10,12 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumtui>=0.5.18
-Requires-Dist: sumx>=0.1.6
+Requires-Dist: sumtui>=0.5.19
+Requires-Dist: sumx>=0.1.8
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a11
+# sumBASIC 0.1.0a13
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -167,17 +167,19 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## IDE execution
 
-Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` executes the **current editor buffer**, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into the run pane as it is produced. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source; `F6` remains the explicit stop key.
+Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` is a **Run/Stop toggle** for the current editor buffer, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into the run pane as it is produced. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source. `F6` changes focus between the Editor and Output windows.
 
 ```text
-F2   Save
-F5   Run current BASIC buffer
-F6   Stop running BASIC program
+F2        Save
+F5        Run / Stop current BASIC buffer
+F6        Next Window (Editor / Output)
+F9        Menu
+F10       Exit
+```
+
+If execution reaches the BASIC statement `STOP`, it is **suspended**, not aborted. The next F5 continues from the statement after `STOP`. Pressing F5 while a program is actively running is a user abort and intentionally does not create a `CONTINUE` point.
 
 For direct command-line execution, `--run` places an interactive POSIX terminal in cbreak mode while BASIC is running so `INKEY$` receives keystrokes immediately rather than waiting for a newline. The original terminal settings are restored on normal exit and exceptions. If a BASIC `INPUT` statement is encountered, sumBASIC temporarily restores ordinary cooked/echo mode for line editing and then returns to immediate-key mode. Windows uses the corresponding non-blocking console-key API.
-F9   Menu
-F10  Exit
-```
 
 Programs that require interactive `INPUT` should currently be run from the sumBASIC console; source-IDE modal input is a separate frontend milestone.
 
@@ -373,7 +375,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a11.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a13.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
@@ -395,7 +397,7 @@ sumbasic --check program.bas
 
 ## Tests
 
-The alpha includes 49 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
+The alpha includes 65 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
 
 
 ### STOP and CONTINUE
