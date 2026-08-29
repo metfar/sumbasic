@@ -380,6 +380,22 @@ sumbasic --check program.bas
 
 The alpha includes 49 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
 
+
+### STOP and CONTINUE
+
+`STOP` is deliberately different from `END`. It returns control to the environment but keeps the current BASIC runtime resumable. `CONTINUE` resumes at the statement immediately following the `STOP`:
+
+```basic
+A! = 1
+PRINT A!
+STOP
+A! = A! + 1
+PRINT A!
+END
+```
+
+After `STOP`, variables, arrays, loop/GOSUB state, and the DATA pointer remain intact. In the command console type `CONTINUE`; in the source IDE F5 continues when the previous run is suspended by a BASIC `STOP`. `END`, `SYSTEM`, or an IDE F5 user-stop terminate the run and do not leave a continuation point.
+
 ## License
 
 GPL-2.0-or-later.

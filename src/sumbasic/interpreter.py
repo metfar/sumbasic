@@ -41,6 +41,13 @@ class _StopProgram(Exception):
     pass;
 
 
+class _BasicStop(Exception):
+    def __init__(self, next_pc, line_number=None):
+        super().__init__(next_pc, line_number);
+        self.next_pc = int(next_pc);
+        self.line_number = line_number;
+
+
 class BasicInterpreter:
     def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None):
         self.program = BasicProgram();
@@ -79,6 +86,8 @@ class BasicInterpreter:
         self.option_base = 0;
         self.stop_requested = threading.Event();
         self.stopped_by_request = False;
+        self.stopped_by_statement = False;
+        self._resume_context = None;
 
     def reset_runtime(self):
         self.channels.close_all();
@@ -92,6 +101,8 @@ class BasicInterpreter:
         self.data_index = 0;
         self.data_line_index = {};
         self.option_base = 0;
+        self._resume_context = None;
+        self.stopped_by_statement = False;
 
     def _db(self):
         if self.database is None: self.database = BasicDatabase(max_areas=10);
@@ -290,24 +301,54 @@ class BasicInterpreter:
             raise _StopProgram();
         return None;
 
-    def run(self):
-        self.stop_requested.clear();
-        self.stopped_by_request = False;
-        self.reset_runtime();
-        execution, line_to_pc = self._build_execution();
-        self._scan_data(execution);
-        block_if = self._match_blocks(execution, "IF", "END IF", else_word="ELSE");
-        while_blocks = self._match_blocks(execution, "WHILE", "WEND");
-        do_blocks = self._match_blocks(execution, "DO", "LOOP");
-        pc = 0;
+    @property
+    def can_continue(self):
+        return self._resume_context is not None;
+
+    def _execute_context(self, context, pc):
+        execution, line_to_pc, block_if, while_blocks, do_blocks = context;
+        self.stopped_by_statement = False;
         try:
             while pc < len(execution):
                 self._stop_if_requested();
                 number, statement = execution[pc];
                 pc = self._execute_statement(statement, pc, number, execution, line_to_pc, block_if, while_blocks, do_blocks);
+        except _BasicStop as stopped:
+            self.stopped_by_statement = True;
+            self._resume_context = (context, stopped.next_pc);
+            where = stopped.line_number;
+            self._emit("Break" if where is None else "Break in {}".format(where));
         except _StopProgram:
-            pass;
+            self._resume_context = None;
+        else:
+            self._resume_context = None;
         return dict(self.variables);
+
+    def run(self):
+        self.stop_requested.clear();
+        self.stopped_by_request = False;
+        self.stopped_by_statement = False;
+        self._resume_context = None;
+        self.reset_runtime();
+        execution, line_to_pc = self._build_execution();
+        self._scan_data(execution);
+        context = (
+            execution,
+            line_to_pc,
+            self._match_blocks(execution, "IF", "END IF", else_word="ELSE"),
+            self._match_blocks(execution, "WHILE", "WEND"),
+            self._match_blocks(execution, "DO", "LOOP"),
+        );
+        return self._execute_context(context, 0);
+
+    def continue_run(self):
+        if self._resume_context is None:
+            raise BasicError("Cannot CONTINUE: no program is stopped");
+        context, pc = self._resume_context;
+        self._resume_context = None;
+        self.stop_requested.clear();
+        self.stopped_by_request = False;
+        return self._execute_context(context, pc);
 
     def _match_blocks(self, execution, start_word, end_word, else_word=None):
         stack = [];
@@ -422,7 +463,8 @@ class BasicInterpreter:
         text = source.strip();
         upper = text.upper();
         if not text or upper.startswith("REM ") or upper == "REM": return pc + 1;
-        if upper in ("END", "SYSTEM", "STOP"): raise _StopProgram();
+        if upper in ("END", "SYSTEM"): raise _StopProgram();
+        if upper == "STOP": raise _BasicStop(pc + 1, line_number);
         if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return pc + 1;
         if upper == "CLS": self._emit("\033[2J\033[H", end=""); return pc + 1;
         match = re.match(r"^OPTION\s+BASE\s+([01])$", text, re.I);
@@ -756,6 +798,7 @@ class BasicInterpreter:
             self.program.set_numbered_line(int(numbered.group(1)), numbered.group(2)); return None;
         upper = text.upper();
         if upper == "RUN": return self.run();
+        if upper in ("CONTINUE", "CONT"): return self.continue_run();
         if upper == "LIST": self._emit(self.program.source_text(), end=""); return None;
         if upper == "NEW": self.program.clear(); self.reset_runtime(); return None;
         match = re.match(r'^LOAD\s+"?([^\"]+)"?$', text, re.I);

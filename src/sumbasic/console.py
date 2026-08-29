@@ -24,7 +24,7 @@ class SumBasicConsoleApp:
         self.command.write("Numbered lines are stored. RUN, LIST, NEW, LOAD, SAVE, RENUM. F10 exits.");
         self.menu = MenuBar([
             Menu("File", [MenuItem("New", lambda: self._run_command("NEW")), MenuItem("Exit", self.app.stop, "F10")]),
-            Menu("Run", [MenuItem("Run", lambda: self._run_command("RUN"), "F5"), MenuItem("List", lambda: self._run_command("LIST"))]),
+            Menu("Run", [MenuItem("Run", lambda: self._run_command("RUN"), "F5"), MenuItem("Continue", lambda: self._run_command("CONTINUE")), MenuItem("List", lambda: self._run_command("LIST"))]),
             Menu("Help", [MenuItem("About", self._about, "F1")]),
         ]);
         self.bar = FunctionBar([("f1", "Help", self._about), ("f5", "Run", lambda: self._run_command("RUN")), ("f9", "Menu", lambda: self.desktop.open_menu(0)), ("f10", "Exit", self.app.stop)]);
@@ -42,7 +42,10 @@ class SumBasicConsoleApp:
     def _submit(self, line, window):
         try:
             self.interpreter.execute_immediate(line);
-            self.status.set("Ready. {} line(s)".format(len(self.interpreter.program.source_lines())));
+            if self.interpreter.can_continue:
+                self.status.set("Stopped. Type CONTINUE to resume.");
+            else:
+                self.status.set("Ready. {} line(s)".format(len(self.interpreter.program.source_lines())));
         except Exception as exc:
             self.command.write_error("Error: {}".format(exc));
             self.status.set("Error");

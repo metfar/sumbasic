@@ -148,27 +148,22 @@ class SumBasicIDE(EditApp):
 
     def _register_keybindings(self):
         super()._register_keybindings();
-        self.keys.register("basic.run", "Run BASIC", ["f5"], context="editor", callback=self.run_program);
-        self.keys.register("basic.stop", "Stop BASIC", ["f6"], context="editor", callback=self.stop_program);
+        self.keys.register("basic.run", "Run / Stop BASIC", ["f5"], context="editor", callback=self.toggle_run);
         return self.keys;
 
     def _make_function_bar(self):
         bar = super()._make_function_bar();
         run_key = self.keys.primary("basic.run");
-        stop_key = self.keys.primary("basic.stop");
         insert_at = min(2, len(bar.actions));
         if run_key:
-            bar.actions.insert(insert_at, FunctionAction(run_key, "Run", None));
-            insert_at += 1;
-        if stop_key:
-            bar.actions.insert(insert_at, FunctionAction(stop_key, "Stop", None));
+            bar.actions.insert(insert_at, FunctionAction(run_key, "Run/Stop", None));
         return bar;
 
     def _menus(self):
         menus = super()._menus();
         menus.append(Menu("Run", [
-            MenuItem("Run current buffer", self.run_program, self._ks("basic.run")),
-            MenuItem("Stop running program", self.stop_program, self._ks("basic.stop")),
+            MenuItem("Run / Stop current buffer", self.toggle_run, self._ks("basic.run")),
+            MenuItem("Continue after BASIC STOP", self.continue_program),
         ]));
         return menus;
 
@@ -212,7 +207,7 @@ class SumBasicIDE(EditApp):
             self._run_error = None;
         self._run_screen.clear();
         self.output_view.set_text("Running...");
-        self.status.set("Running. F6 stops the current BASIC program.");
+        self.status.set("Running. F5 stops; F6 switches editor/output window.");
         return None;
 
     def _run_worker(self, source):
@@ -239,6 +234,9 @@ class SumBasicIDE(EditApp):
             message = "Error: {}".format(error);
             self.output_view.set_text((rendered + "\n" if rendered else "") + message);
             self.status.set("Run error");
+        elif self.basic_interpreter.stopped_by_statement:
+            self.output_view.set_text(rendered if rendered else "Program stopped by STOP.");
+            self.status.set("BASIC STOP. CONTINUE or F5 resumes from the next statement.");
         elif self.basic_interpreter.stopped_by_request:
             self.output_view.set_text(rendered if rendered else "Program stopped.");
             self.status.set("Run stopped");
@@ -249,9 +247,51 @@ class SumBasicIDE(EditApp):
         self.app.invalidate();
         return True;
 
+    def window_targets(self):
+        return [self.editor, self.output_view];
+
+    def toggle_run(self):
+        if self._run_thread is not None and self._run_thread.is_alive():
+            return self.stop_program();
+        if self.basic_interpreter.can_continue:
+            return self.continue_program();
+        return self.run_program();
+
+    def _continue_worker(self):
+        try:
+            self.basic_interpreter.continue_run();
+        except Exception as exc:
+            with self._run_lock:
+                self._run_error = exc;
+        finally:
+            with self._run_lock:
+                self._run_finished = True;
+                self._run_dirty = True;
+        return None;
+
+    def continue_program(self):
+        if self._run_thread is not None and self._run_thread.is_alive():
+            self.status.set("Program is already running.");
+            return True;
+        if not self.basic_interpreter.can_continue:
+            self.status.set("No BASIC STOP to continue from.");
+            return True;
+        with self._run_lock:
+            self._run_finished = False;
+            self._run_error = None;
+            self._run_dirty = True;
+        self.status.set("Continuing after STOP. F5 stops; F6 switches windows.");
+        if not self.app.running:
+            self._continue_worker();
+            return self._finish_sync();
+        self._run_thread = threading.Thread(target=self._continue_worker, name="sumBASIC-continue", daemon=True);
+        self._run_thread.start();
+        self.app.invalidate();
+        return True;
+
     def run_program(self):
         if self._run_thread is not None and self._run_thread.is_alive():
-            self.status.set("Program already running. Press F6 to stop it.");
+            self.status.set("Program already running. Press F5 to stop it.");
             return True;
         source = self.editor.text;
         self._prepare_run();
@@ -288,6 +328,9 @@ class SumBasicIDE(EditApp):
                 message = "Error: {}".format(error);
                 self.output_view.set_text((rendered + "\n" if rendered else "") + message);
                 self.status.set("Run error");
+            elif self.basic_interpreter.stopped_by_statement:
+                self.output_view.set_text(rendered if rendered else "Program stopped by STOP.");
+                self.status.set("BASIC STOP. CONTINUE or F5 resumes from the next statement.");
             elif self.basic_interpreter.stopped_by_request:
                 self.output_view.set_text(rendered if rendered else "Program stopped.");
                 self.status.set("Run stopped");

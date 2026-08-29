@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a12
+
+- IDE key convention changed to **F5 = Run/Stop toggle** and **F6 = switch editor/output window**. F6 is no longer consumed as an emergency stop key.
+- `STOP` now has classic resumable semantics: it suspends execution after the `STOP` statement while preserving variables, arrays, DATA position, GOSUB stack, and FOR state. `CONTINUE` (and `CONT`) resumes from that saved execution point.
+- In the source IDE, pressing F5 after a BASIC `STOP` continues the suspended program; the Run menu also exposes Continue explicitly. A user-requested F5 stop still terminates the current run rather than creating a resumable BASIC STOP.
+- The interactive sumBASIC console exposes `CONTINUE` in the Run menu and reports when a stopped program can be resumed.
+- Updated the sumTUI dependency to 0.5.18 for common F6 window switching and corrected multi-row dialog geometry.
+- Regression suite: 65 tests. No ASC codes changed.
+
 ## 0.1.0a11
 
 - Fixed command-line `INKEY$` for `sumbasic --run`: interactive terminal programs now receive keys immediately without requiring Enter.

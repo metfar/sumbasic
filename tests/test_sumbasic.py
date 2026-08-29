@@ -551,7 +551,7 @@ def test_ide_run_screen_understands_cls_and_locate():
     assert 'old' not in screen.text();
 
 
-def test_ide_f5_is_nonblocking_and_f6_stops_running_program(tmp_path):
+def test_ide_f5_toggles_nonblocking_run_stop_and_f6_switches_windows(tmp_path):
     import time;
     from sumbasic.ide import SumBasicIDE;
     path = tmp_path / 'loop.bas';
@@ -560,12 +560,18 @@ def test_ide_f5_is_nonblocking_and_f6_stops_running_program(tmp_path):
     ide.editor.set_text('DO\nA! = A! + 1\nLOOP\n', modified=True);
     ide.app.running = True;
     started = time.monotonic();
-    ide.run_program();
+    ide.toggle_run();
     elapsed = time.monotonic() - started;
     assert elapsed < 0.25;
     assert ide._run_thread is not None and ide._run_thread.is_alive();
-    assert ide.keys.primary('basic.stop') == 'f6';
-    ide.stop_program();
+    assert ide.keys.primary('basic.run') == 'f5';
+    assert ide.keys.primary('window.next') == 'f6';
+    ide.app.focus.set(ide.editor);
+    ide.switch_window();
+    assert ide.app.focus.current is ide.output_view;
+    ide.switch_window();
+    assert ide.app.focus.current is ide.editor;
+    ide.toggle_run();
     ide._run_thread.join(timeout=2.0);
     assert not ide._run_thread.is_alive();
     ide._poll_run_state();
@@ -764,3 +770,46 @@ def test_terminal_inkey_distinguishes_bare_escape_from_arrow_sequence():
         stream.close();
         os.close(master_fd);
         os.close(slave_fd);
+
+
+def test_stop_preserves_runtime_and_continue_resumes_after_statement():
+    output = [];
+    basic = BasicInterpreter(output_func=lambda text="", end="\n": output.append(str(text) + ("" if end == "" else end)));
+    basic.program.load_text('A! = 1\nPRINT A!\nSTOP\nA! = A! + 1\nPRINT A!\nEND\n');
+    basic.run();
+    assert basic.can_continue is True;
+    assert basic.stopped_by_statement is True;
+    assert basic.expr.get('A!') == 1;
+    assert ''.join(output) == '1\nBreak in 3\n';
+    basic.continue_run();
+    assert basic.can_continue is False;
+    assert basic.expr.get('A!') == 2;
+    assert ''.join(output) == '1\nBreak in 3\n2\n';
+
+
+def test_immediate_continue_requires_prior_stop_and_resumes():
+    basic, out = runner('PRINT "before"\nSTOP\nPRINT "after"\nEND\n');
+    assert 'before' in out;
+    assert basic.can_continue is True;
+    chunks = [];
+    basic.output_func = lambda text="", end="\n": chunks.append(str(text) + ("" if end == "" else end));
+    basic.execute_immediate('CONTINUE');
+    assert ''.join(chunks) == 'after\n';
+    try:
+        basic.execute_immediate('CONTINUE');
+        assert False, 'CONTINUE without STOP should fail';
+    except Exception as exc:
+        assert 'Cannot CONTINUE' in str(exc);
+
+
+def test_ide_f5_continues_after_basic_stop(tmp_path):
+    from sumbasic.ide import SumBasicIDE;
+    path = tmp_path / 'stop.bas';
+    path.write_text('PRINT "before"\nSTOP\nPRINT "after"\nEND\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    ide.run_program();
+    assert ide.basic_interpreter.can_continue is True;
+    assert 'before' in ide.output_view.text;
+    ide.toggle_run();
+    assert ide.basic_interpreter.can_continue is False;
+    assert 'after' in ide.output_view.text;

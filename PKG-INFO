@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a11
+Version: 0.1.0a12
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,7 +10,7 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumtui>=0.5.16
+Requires-Dist: sumtui>=0.5.18
 Requires-Dist: sumx>=0.1.6
 Requires-Dist: rich>=13.0
 Dynamic: license-file
@@ -396,6 +396,22 @@ sumbasic --check program.bas
 ## Tests
 
 The alpha includes 49 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
+
+
+### STOP and CONTINUE
+
+`STOP` is deliberately different from `END`. It returns control to the environment but keeps the current BASIC runtime resumable. `CONTINUE` resumes at the statement immediately following the `STOP`:
+
+```basic
+A! = 1
+PRINT A!
+STOP
+A! = A! + 1
+PRINT A!
+END
+```
+
+After `STOP`, variables, arrays, loop/GOSUB state, and the DATA pointer remain intact. In the command console type `CONTINUE`; in the source IDE F5 continues when the previous run is suspended by a BASIC `STOP`. `END`, `SYSTEM`, or an IDE F5 user-stop terminate the run and do not leave a continuation point.
 
 ## License
 
