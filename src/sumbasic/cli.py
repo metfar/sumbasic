@@ -5,12 +5,12 @@
 #  Copyright 2018- William Martinez Bas <metfar@gmail.com>
 #  
 import argparse;
-import subprocess;
 import sys;
 from pathlib import Path;
 
 from . import __version__;
 from .console import SumBasicConsoleApp;
+from .ide import SumBasicIDE;
 from .interpreter import BasicInterpreter;
 
 
@@ -25,16 +25,12 @@ def _plain_repl(interpreter):
 
 
 def _edit_file(path):
-    try:
-        return subprocess.call(["sumedit", str(path)]);
-    except FileNotFoundError:
-        from sumtui.tools.edit import main as edit_main;
-        return int(edit_main([str(path)]) or 0);
+    return int(SumBasicIDE(path=path).run() or 0);
 
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="sumbasic", description="Educational console BASIC for the Sum ecosystem.");
-    parser.add_argument("file", nargs="?", help="BASIC source file; opens in sumedit unless --run/--check is used");
+    parser.add_argument("file", nargs="?", help="BASIC source file; opens in the sumBASIC IDE unless --run/--check is used");
     parser.add_argument("--run", action="store_true", help="run a BASIC program");
     parser.add_argument("--check", action="store_true", help="parse/load the program without running it");
     parser.add_argument("--plain", action="store_true", help="use the plain terminal REPL instead of sumTUI");

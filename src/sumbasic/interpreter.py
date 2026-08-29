@@ -23,6 +23,7 @@ import re;
 import time;
 from pathlib import Path;
 
+from .audio import GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, SystemTonePlayer, gw_ticks_to_seconds, spectrum_pitch_frequency;
 from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
 from .expressions import ExpressionEvaluator;
@@ -40,7 +41,7 @@ class _StopProgram(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None):
         self.program = BasicProgram();
         self.variables = {};
         self.variable_types = {};
@@ -52,6 +53,8 @@ class BasicInterpreter:
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
+        self.tone_player = SystemTonePlayer();
+        self.tone_func = tone_func if tone_func is not None else self.tone_player.play;
         self.expr = ExpressionEvaluator(self.variables, self.variable_types, self.arrays, extra_functions={
             "EOF": lambda channel: self.channels.eof(channel),
             "LOF": lambda channel: self.channels.lof(channel),
@@ -600,6 +603,27 @@ class BasicInterpreter:
                 while not self.inkey_func(): self.sleep_func(0.01);
             else:
                 self.sleep_func(frames / 50.0);
+            return pc + 1;
+        match = re.match(r"^BEEP\s+(.+)$", text, re.I);
+        if match:
+            args = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(args) != 2: raise BasicError("BEEP requires: duration, pitch");
+            duration = float(self.expr.eval(args[0]));
+            pitch = float(self.expr.eval(args[1]));
+            if duration < 0: raise BasicError("BEEP duration must be non-negative");
+            frequency = spectrum_pitch_frequency(pitch);
+            self.tone_func(frequency, duration, True);
+            return pc + 1;
+        match = re.match(r"^SOUND\s+(.+)$", text, re.I);
+        if match:
+            args = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(args) != 2: raise BasicError("SOUND requires: frequency, duration");
+            frequency = float(self.expr.eval(args[0]));
+            ticks = float(self.expr.eval(args[1]));
+            if frequency < GW_BASIC_SOUND_MIN_HZ or frequency > GW_BASIC_SOUND_MAX_HZ:
+                raise BasicError("SOUND frequency must be between 37 and 32767 Hz");
+            if ticks < 0: raise BasicError("SOUND duration must be non-negative");
+            self.tone_func(frequency, gw_ticks_to_seconds(ticks), False);
             return pc + 1;
         assignment = re.match(r"^(?:LET\s+)?(.+?)\s*=\s*(.+)$", text, re.I);
         if assignment:

@@ -446,3 +446,62 @@ def test_retro_clock_example_loads_and_uses_time_font_data():
     assert 'TIMER' in text;
     assert 'PAUSE 50' in text;
     assert 'DATA " ███ "' in text;
+
+
+def test_beep_uses_spectrum_duration_pitch_and_blocks():
+    import math;
+    tones = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic.program.load_text('BEEP 1, 0\nBEEP .5, 12\nBEEP .25, -12\n');
+    basic.run();
+    assert len(tones) == 3;
+    assert math.isclose(tones[0][0], 261.6255653005986, rel_tol=0.0, abs_tol=1e-9);
+    assert tones[0][1:] == (1.0, True);
+    assert math.isclose(tones[1][0], 523.2511306011972, rel_tol=0.0, abs_tol=1e-9);
+    assert tones[1][1:] == (0.5, True);
+    assert math.isclose(tones[2][0], 130.8127826502993, rel_tol=0.0, abs_tol=1e-9);
+    assert tones[2][1:] == (0.25, True);
+
+
+def test_sound_uses_gwbasic_hz_ticks_and_is_background():
+    import math;
+    tones = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic.program.load_text('SOUND 262, 18.2\nSOUND 440, 9.1\n');
+    basic.run();
+    assert tones[0][0] == 262.0;
+    assert math.isclose(tones[0][1], 1.0, rel_tol=0.0, abs_tol=1e-12);
+    assert tones[0][2] is False;
+    assert tones[1][0] == 440.0;
+    assert math.isclose(tones[1][1], 0.5, rel_tol=0.0, abs_tol=1e-12);
+    assert tones[1][2] is False;
+
+
+def test_sound_historical_frequency_range_is_enforced():
+    from sumbasic import BasicError;
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda *args: None);
+    basic.program.load_text('SOUND 36, 1\n');
+    try:
+        basic.run();
+        assert False, 'SOUND below 37 Hz should fail';
+    except BasicError:
+        pass;
+    basic.program.load_text('SOUND 32768, 1\n');
+    try:
+        basic.run();
+        assert False, 'SOUND above 32767 Hz should fail';
+    except BasicError:
+        pass;
+
+
+def test_ide_f5_runs_current_unsaved_editor_buffer(tmp_path):
+    from sumbasic.ide import SumBasicIDE;
+    path = tmp_path / 'program.bas';
+    path.write_text('PRINT "saved"\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    ide.editor.set_text('PRINT "unsaved"\n', modified=True);
+    assert ide.keys.primary('basic.run') == 'f5';
+    ide.run_program();
+    assert ide.output_view.text == 'unsaved';
+    assert ide.editor.modified is True;
+    assert path.read_text(encoding='utf-8') == 'PRINT "saved"\n';

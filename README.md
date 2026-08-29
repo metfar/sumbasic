@@ -1,4 +1,4 @@
-# sumBASIC 0.1.0a5
+# sumBASIC 0.1.0a6
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -122,6 +122,30 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 `TIME$` returns the local wall-clock time as `HH:MM:SS`. `TIMER` returns seconds since local midnight, including a fractional part when the host clock provides it. `PAUSE n` uses the Spectrum convention of 50 frames per second, so `PAUSE 50` waits approximately one second.
 
 `examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. The demo runs for ten seconds by default so it is safe to launch from tests or a shell; its outer `FOR` can be replaced by `DO`/`LOOP` for continuous display.
+
+## IDE execution
+
+Opening a BASIC source file now uses the sumBASIC-aware sumTUI IDE. `F5` executes the **current editor buffer**, including unsaved edits, and places program output in the IDE output pane. Running does not silently save or modify the source file.
+
+```text
+F2   Save
+F5   Run current BASIC buffer
+F9   Menu
+F10  Exit
+```
+
+Programs that require interactive `INPUT` should currently be run from the sumBASIC console; source-IDE modal input is a separate frontend milestone.
+
+## BEEP and SOUND
+
+sumBASIC deliberately keeps the ZX Spectrum and GW-BASIC tone models distinct:
+
+```basic
+BEEP 1, 0
+SOUND 262, 18.2
+```
+
+`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. See `docs/AUDIO.md` and `examples/sound.bas`.
 
 ## DATA, READ and RESTORE
 
@@ -304,7 +328,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a5.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a6.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
@@ -312,7 +336,7 @@ The parser does not depend on those numeric positions; they remain a cross-proje
 
 Structured `SUB`/`FUNCTION` execution and `CALL ... WITH ...` are reserved design work for the next procedure-scope milestone. The current `DIM SHARED` implementation establishes the global-state semantics those procedures will use.
 
-Also pending: full graphics rendering, virtual `PEEK`/`POKE` and port I/O, sound, events/errors beyond current control flow, SumIR emission, and Python/native compilation.
+Also pending: full graphics rendering, virtual `PEEK`/`POKE` and port I/O, richer music/`PLAY` support, events/errors beyond current control flow, SumIR emission, and Python/native compilation.
 
 ## Usage
 
@@ -326,7 +350,7 @@ sumbasic --check program.bas
 
 ## Tests
 
-The alpha includes 38 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
+The alpha includes 49 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
 
 ## License
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a6
+
+- Added a sumBASIC-aware source IDE based on sumTUI edit; `F5` runs the current editor buffer without forcing a save first and shows program output in an IDE output pane.
+- Implemented ZX Spectrum-style `BEEP duration, pitch`: seconds first, semitone offset from Middle C second, blocking execution.
+- Implemented GW-BASIC-style `SOUND frequency, duration`: Hertz first, duration in 18.2 Hz PC timer ticks, non-blocking/background execution, historical `37..32767` Hz range.
+- Added a pluggable tone backend with Windows/native and common POSIX best-effort playback plus a terminal-bell fallback.
+- Added `docs/AUDIO.md`, `examples/sound.bas`, and regression tests for BEEP/SOUND timing, pitch/frequency conversion, range checking, background semantics, and F5 unsaved-buffer execution.
+- No new ASC token numbers were required: `BEEP` and `SOUND` already occupy their historical shared-table positions, while F5 is an IDE key binding rather than a BASIC token.
+
 ## 0.1.0a5
 
 - Corrected logarithm semantics: `LOG(x)` is base 10 and `LN(x)` is natural/base `e`; arbitrary-base logarithms are now `LOGB(x, base)` / `LOGBASE(x, base)`.
