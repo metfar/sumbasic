@@ -1,4 +1,4 @@
-# sumBASIC 0.1.0a7
+# sumBASIC 0.1.0a8
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -125,11 +125,12 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## IDE execution
 
-Opening a BASIC source file now uses the sumBASIC-aware sumTUI IDE. `F5` executes the **current editor buffer**, including unsaved edits, and places program output in the IDE output pane. Running does not silently save or modify the source file.
+Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` executes the **current editor buffer**, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into the run pane as it is produced. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences.
 
 ```text
 F2   Save
 F5   Run current BASIC buffer
+F6   Stop running BASIC program
 F9   Menu
 F10  Exit
 ```
@@ -145,7 +146,7 @@ BEEP 1, 0
 SOUND 262, 18.2
 ```
 
-`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. See `docs/AUDIO.md` and `examples/sound.bas`. In 0.1.0a7 both commands use the same monophonic tone generator: SOUND converts Hertz to an equivalent fractional BEEP pitch and queues background notes sequentially, preventing overlapping POSIX audio processes from distorting sweeps and melodies.
+`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. See `docs/AUDIO.md` and `examples/sound.bas`. Since 0.1.0a7 both commands use the same monophonic tone generator: SOUND converts Hertz to an equivalent fractional BEEP pitch and queues background notes sequentially, preventing overlapping POSIX audio processes from distorting sweeps and melodies.
 
 ## DATA, READ and RESTORE
 
@@ -328,7 +329,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a7.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a8.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

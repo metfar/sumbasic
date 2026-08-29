@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0a8
+
+- Fixed the IDE `F5` freeze: BASIC execution now runs on a worker thread while the sumTUI event loop remains responsive.
+- IDE program output is streamed while the program is running instead of appearing only after `RUN` returns.
+- Added a small ANSI-aware run screen so `CLS`, `LOCATE` and terminal-style text programs such as `examples/retro_clock.bas` render coherently inside the IDE output pane.
+- Added `F6` Stop and cooperative interpreter cancellation; infinite `DO/LOOP`, `WHILE/WEND`, `FOR/NEXT` and `PAUSE 0` programs can be stopped without killing the IDE.
+- Pressing `F5` while a program is already running no longer starts a second interpreter run.
+- Expanded the IDE run pane to 12 rows so the 7-row retro font plus clock/status output fits comfortably on ordinary terminals.
+- Added regression tests for asynchronous F5 execution, F6 cancellation and the ANSI run-screen buffer.
+- No ASC entries changed in this release; F5/F6 are IDE controls rather than BASIC tokens.
+
+
 ## 0.1.0a7
 
 - Fixed distorted/overlapping `SOUND` playback on POSIX systems by replacing one-thread-per-note playback with a single monophonic tone queue.

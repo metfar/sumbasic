@@ -20,6 +20,7 @@
 #  MA 02110-1301, USA.
 #  
 import re;
+import threading;
 import time;
 from pathlib import Path;
 
@@ -76,6 +77,8 @@ class BasicInterpreter:
         self.data_index = 0;
         self.data_line_index = {};
         self.option_base = 0;
+        self.stop_requested = threading.Event();
+        self.stopped_by_request = False;
 
     def reset_runtime(self):
         self.channels.close_all();
@@ -245,7 +248,20 @@ class BasicInterpreter:
         self.data_line_index = lines;
         self.data_index = 0;
 
+    def request_stop(self):
+        """Request cooperative termination of the currently running BASIC program."""
+        self.stop_requested.set();
+        return True;
+
+    def _stop_if_requested(self):
+        if self.stop_requested.is_set():
+            self.stopped_by_request = True;
+            raise _StopProgram();
+        return None;
+
     def run(self):
+        self.stop_requested.clear();
+        self.stopped_by_request = False;
         self.reset_runtime();
         execution, line_to_pc = self._build_execution();
         self._scan_data(execution);
@@ -255,6 +271,7 @@ class BasicInterpreter:
         pc = 0;
         try:
             while pc < len(execution):
+                self._stop_if_requested();
                 number, statement = execution[pc];
                 pc = self._execute_statement(statement, pc, number, execution, line_to_pc, block_if, while_blocks, do_blocks);
         except _StopProgram:
@@ -600,9 +617,12 @@ class BasicInterpreter:
             frames = float(self.expr.eval(match.group(1)));
             if frames < 0: raise BasicError("PAUSE requires a non-negative frame count");
             if frames == 0:
-                while not self.inkey_func(): self.sleep_func(0.01);
+                while not self.inkey_func():
+                    self._stop_if_requested();
+                    self.sleep_func(0.01);
             else:
                 self.sleep_func(frames / 50.0);
+                self._stop_if_requested();
             return pc + 1;
         match = re.match(r"^BEEP\s+(.+)$", text, re.I);
         if match:

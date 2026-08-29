@@ -534,3 +534,38 @@ def test_system_tone_player_serializes_background_sound_requests():
         ("start", 330.0), ("end", 330.0),
         ("start", 440.0), ("end", 440.0),
     ];
+
+
+def test_ide_run_screen_understands_cls_and_locate():
+    from sumbasic.ide import _VirtualRunScreen;
+    screen = _VirtualRunScreen();
+    screen.write('old');
+    screen.write('\033[2J\033[H', end='');
+    screen.write('\033[4;3H', end='');
+    screen.write('HI', end='');
+    lines = screen.text().splitlines();
+    assert lines[3] == '  HI';
+    assert 'old' not in screen.text();
+
+
+def test_ide_f5_is_nonblocking_and_f6_stops_running_program(tmp_path):
+    import time;
+    from sumbasic.ide import SumBasicIDE;
+    path = tmp_path / 'loop.bas';
+    path.write_text('PRINT "saved"\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    ide.editor.set_text('DO\nA! = A! + 1\nLOOP\n', modified=True);
+    ide.app.running = True;
+    started = time.monotonic();
+    ide.run_program();
+    elapsed = time.monotonic() - started;
+    assert elapsed < 0.25;
+    assert ide._run_thread is not None and ide._run_thread.is_alive();
+    assert ide.keys.primary('basic.stop') == 'f6';
+    ide.stop_program();
+    ide._run_thread.join(timeout=2.0);
+    assert not ide._run_thread.is_alive();
+    ide._poll_run_state();
+    assert ide.basic_interpreter.stopped_by_request is True;
+    assert ide.status.text == 'Run stopped';
+    ide.app.running = False;
