@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a10
+Version: 0.1.0a11
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -15,7 +15,7 @@ Requires-Dist: sumx>=0.1.6
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a10
+# sumBASIC 0.1.0a11
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -163,7 +163,7 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 `TIME$` returns the local wall-clock time as `HH:MM:SS`. `TIMER` returns seconds since local midnight, including a fractional part when the host clock provides it. `PAUSE n` uses the Spectrum convention of 50 frames per second, so `PAUSE 50` waits approximately one second.
 
-`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. It now runs continuously and exits when Escape, `Q`, or `q` is pressed. Each update plays `BEEP .1, 0`; because `BEEP` is blocking and Spectrum `PAUSE` is measured at 50 ticks per second, `PAUSE 45` contributes 0.9 seconds for an approximately one-second clock cadence.
+`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. It runs continuously and exits when Escape, `Q`, or `q` is pressed. Each update plays `BEEP .1, 0`; because `BEEP` is blocking and Spectrum `PAUSE` is measured at 50 ticks per second, `PAUSE 45` contributes 0.9 seconds for an approximately one-second clock cadence. The same immediate `INKEY$` exit works both inside the IDE and with `sumbasic --run examples/retro_clock.bas`; on an interactive terminal no Enter key is required.
 
 ## IDE execution
 
@@ -173,6 +173,8 @@ Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` executes th
 F2   Save
 F5   Run current BASIC buffer
 F6   Stop running BASIC program
+
+For direct command-line execution, `--run` places an interactive POSIX terminal in cbreak mode while BASIC is running so `INKEY$` receives keystrokes immediately rather than waiting for a newline. The original terminal settings are restored on normal exit and exceptions. If a BASIC `INPUT` statement is encountered, sumBASIC temporarily restores ordinary cooked/echo mode for line editing and then returns to immediate-key mode. Windows uses the corresponding non-blocking console-key API.
 F9   Menu
 F10  Exit
 ```
@@ -371,7 +373,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a10.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a11.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

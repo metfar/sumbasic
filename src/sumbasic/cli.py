@@ -12,6 +12,7 @@ from . import __version__;
 from .console import SumBasicConsoleApp;
 from .ide import SumBasicIDE;
 from .interpreter import BasicInterpreter;
+from .terminal_input import TerminalInput;
 
 
 def _plain_repl(interpreter):
@@ -49,10 +50,13 @@ def main(argv=None):
         if args.check:
             interpreter._build_execution(); print("{}: OK".format(args.file)); return 0;
         if args.run:
-            interpreter.run();
-            # SOUND is non-blocking while BASIC executes, but a one-shot CLI
-            # process must stay alive long enough for its queued final notes.
-            interpreter.tone_player.wait_for_background();
+            with TerminalInput() as terminal:
+                interpreter.input_func = terminal.input;
+                interpreter.inkey_func = terminal.inkey;
+                interpreter.run();
+                # SOUND is non-blocking while BASIC executes, but a one-shot CLI
+                # process must stay alive long enough for its queued final notes.
+                interpreter.tone_player.wait_for_background();
             return 0;
     if args.plain: return _plain_repl(interpreter);
     return int(SumBasicConsoleApp(interpreter=interpreter).run() or 0);

@@ -1,7 +1,7 @@
 # Retro digital clock for sumBASIC.
 # TIME$ supplies HH:MM:SS. TIMER is seconds since local midnight.
 # The bitmap font is loaded once from DATA into DIM SHARED arrays.
-# The clock runs until Escape, Q or q is pressed in the IDE.
+# The clock runs until Escape, Q or q is pressed in the IDE or --run console.
 
 DIM SHARED Font$(9, 6), Colon$(6)
 

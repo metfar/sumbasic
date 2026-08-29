@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0a11
+
+- Fixed command-line `INKEY$` for `sumbasic --run`: interactive terminal programs now receive keys immediately without requiring Enter.
+- Added a terminal input adapter that keeps POSIX terminals in cbreak mode while a BASIC program runs and restores the original terminal attributes on exit.
+- A BASIC `INPUT` statement temporarily restores normal cooked/echo terminal mode so line input remains editable, then resumes immediate `INKEY$` mode.
+- Added Windows non-blocking console-key support through `msvcrt`.
+- Escape remains `CHR$(27)`; ANSI cursor/function-key sequences are read as a sequence rather than misreported as a bare Escape whenever the remaining bytes arrive together.
+- Updated `examples/retro_clock.bas` documentation: Escape/Q/q now works in both the F5 IDE run and direct `--run` console execution.
+- Added pseudo-terminal regression tests proving a key can be read without a newline and distinguishing bare Escape from an ANSI arrow sequence.
+- No ASC indices changed in this release; this is terminal frontend behavior.
+
 ## 0.1.0a10
 
 - Added free-form named labels using `:Name`; `GOTO Name` and `GOSUB Name` are case-insensitive and coexist with classic numeric line targets.

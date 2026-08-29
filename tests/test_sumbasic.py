@@ -705,3 +705,62 @@ def test_ide_routes_q_and_escape_to_running_program_inkey(tmp_path):
     ide._run_thread.join(timeout=2.0);
     assert not ide._run_thread.is_alive();
     ide.app.running = False;
+
+
+
+def test_terminal_inkey_reads_posix_key_without_enter():
+    import os;
+    if os.name == "nt":
+        return;
+    import pty;
+    import time;
+    from sumbasic.terminal_input import TerminalInput;
+    master_fd, slave_fd = pty.openpty();
+    stream = os.fdopen(os.dup(slave_fd), "r", buffering=1, encoding="utf-8");
+    try:
+        with TerminalInput(stream) as terminal:
+            os.write(master_fd, b"q");
+            deadline = time.monotonic() + 1.0;
+            value = "";
+            while not value and time.monotonic() < deadline:
+                value = terminal.inkey();
+                if not value:
+                    time.sleep(.005);
+            assert value == "q";
+    finally:
+        stream.close();
+        os.close(master_fd);
+        os.close(slave_fd);
+
+
+def test_terminal_inkey_distinguishes_bare_escape_from_arrow_sequence():
+    import os;
+    if os.name == "nt":
+        return;
+    import pty;
+    import time;
+    from sumbasic.terminal_input import TerminalInput;
+    master_fd, slave_fd = pty.openpty();
+    stream = os.fdopen(os.dup(slave_fd), "r", buffering=1, encoding="utf-8");
+    try:
+        with TerminalInput(stream) as terminal:
+            os.write(master_fd, b"\x1b[A");
+            deadline = time.monotonic() + 1.0;
+            value = "";
+            while not value and time.monotonic() < deadline:
+                value = terminal.inkey();
+                if not value:
+                    time.sleep(.005);
+            assert value == "\x1b[A";
+            os.write(master_fd, b"\x1b");
+            deadline = time.monotonic() + 1.0;
+            value = "";
+            while not value and time.monotonic() < deadline:
+                value = terminal.inkey();
+                if not value:
+                    time.sleep(.005);
+            assert value == "\x1b";
+    finally:
+        stream.close();
+        os.close(master_fd);
+        os.close(slave_fd);
