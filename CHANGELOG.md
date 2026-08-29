@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.0a9
+
+- Fixed hybrid free-form/classic line-number execution. A numeric line such as `10 PRINT ...` inside otherwise unnumbered source is now kept at its physical position and acts as a classic `GOTO`/`GOSUB` target instead of causing all unnumbered statements to be moved after it.
+- `GOTO 10` in a modern source buffer now jumps to the explicit `10` label and continues from there exactly once unless the program itself jumps back.
+- Added an explicit hybrid program representation to `BasicProgram`; pure classic programs still execute in numeric line-number order, while pure free-form and hybrid programs execute in physical source order.
+- `RENUM` now preserves hybrid physical order while renumbering explicit labels and rewriting `GOTO`, `GOSUB`, inline `THEN`/`ELSE`, and `RESTORE` targets.
+- `RESTORE <line>` in hybrid source now targets explicit BASIC line labels rather than accidental physical editor line numbers.
+- Added regression tests using the reported `sound.bas` pattern (`GOTO 10` before a later `10 PRINT ...`) to ensure the skipped BEEP block stays skipped and the SOUND heading is printed only once.
+- No ASC entries changed in this release.
+
 ## 0.1.0a8
 
 - Fixed the IDE `F5` freeze: BASIC execution now runs on a worker thread while the sumTUI event loop remains responsive.

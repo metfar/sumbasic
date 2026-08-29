@@ -210,10 +210,17 @@ class BasicInterpreter:
     def _build_execution(self):
         execution = [];
         line_to_pc = {};
-        for number, source in self.program.source_lines():
-            line_to_pc[int(number)] = len(execution);
+        self.execution_label_by_pc = {};
+        for number, source, explicit_label in self.program.execution_records():
+            first_pc = len(execution);
+            if explicit_label is not None:
+                line_to_pc[int(explicit_label)] = first_pc;
             clean = self._strip_comment(source);
-            for statement in self._split_colon(clean): execution.append((int(number), statement));
+            for statement in self._split_colon(clean):
+                statement_pc = len(execution);
+                execution.append((int(number), statement));
+                if explicit_label is not None:
+                    self.execution_label_by_pc[statement_pc] = int(explicit_label);
         return execution, line_to_pc;
 
     def _parse_data_value(self, source):
@@ -239,10 +246,12 @@ class BasicInterpreter:
     def _scan_data(self, execution):
         data = [];
         lines = {};
-        for number, statement in execution:
+        for pc, (_, statement) in enumerate(execution):
             match = re.match(r"^DATA(?:\s+(.*))?$", statement, re.I);
             if not match: continue;
-            if int(number) not in lines: lines[int(number)] = len(data);
+            explicit_label = getattr(self, "execution_label_by_pc", {}).get(pc);
+            if explicit_label is not None and explicit_label not in lines:
+                lines[explicit_label] = len(data);
             for item in self._split_top_level(match.group(1) or "", separators=",", keep_empty=True): data.append(self._parse_data_value(item));
         self.data = data;
         self.data_line_index = lines;

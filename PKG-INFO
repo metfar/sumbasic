@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a8
+Version: 0.1.0a9
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -15,7 +15,7 @@ Requires-Dist: sumx>=0.1.6
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a8
+# sumBASIC 0.1.0a9
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -24,6 +24,20 @@ This alpha makes the language model substantially more explicit: Spectrum-compat
 ## Language identity
 
 sumBASIC is BASIC, but it is not intended to be a byte-for-byte clone of GW-BASIC, QuickBASIC or Sinclair BASIC. Compatibility is preserved where it remains useful; deliberate differences are documented.
+
+### Classic line numbers inside modern source
+
+sumBASIC deliberately permits classic numeric jump targets inside otherwise free-form source:
+
+```basic
+PRINT "before"
+GOTO 100
+PRINT "skipped"
+100 PRINT "target"
+PRINT "after"
+```
+
+This prints `before`, `target`, and `after`. In a **hybrid** source file the numeric line is a jump label at that physical position; it does not reorder the surrounding unnumbered source. Fully numbered classic programs continue to execute in numeric line-number order. This lets teaching examples mix structured/free-form BASIC with `GOTO`, `GOSUB`, and line-aware `RESTORE` when demonstrating historical control flow.
 
 Comments have three forms:
 
@@ -346,7 +360,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a8.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a9.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

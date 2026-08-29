@@ -569,3 +569,59 @@ def test_ide_f5_is_nonblocking_and_f6_stops_running_program(tmp_path):
     assert ide.basic_interpreter.stopped_by_request is True;
     assert ide.status.text == 'Run stopped';
     ide.app.running = False;
+
+
+def test_hybrid_numbered_label_preserves_physical_source_order():
+    source = '''# Modern free-form BASIC can still use a classic numbered jump target.
+PRINT "start"
+GOTO 100
+PRINT "wrong"
+100 PRINT "target"
+PRINT "done"
+END
+''';
+    basic, out = runner(source);
+    assert out == 'start\ntarget\ndone\n';
+    assert basic.program.source_text() == source;
+
+
+def test_sound_example_style_goto_skips_beep_block_without_looping():
+    tones = [];
+    output = [];
+    source = '''# Two historical sound models in the same educational BASIC.
+GOTO 10
+PRINT "Spectrum BEEP: chromatic octave"
+FOR Note! = 0 TO 12
+    BEEP .08, Note!
+NEXT Note!
+
+10 PRINT "GW-BASIC SOUND: queued monophonic frequency sweep"
+FOR Frequency! = 220 TO 880 STEP 55
+    SOUND Frequency!, 1
+NEXT Frequency!
+
+BEEP 1, 0
+SOUND 262, 18.2
+END
+''';
+    basic = BasicInterpreter(output_func=lambda text, end="\n": output.append(str(text) + end), tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic.program.load_text(source);
+    basic.run();
+    assert ''.join(output) == 'GW-BASIC SOUND: queued monophonic frequency sweep\n';
+    assert len(tones) == 15;
+    assert all(item[2] is False for item in tones[:13]);
+    assert tones[13][2] is True;
+    assert tones[14][2] is False;
+
+
+def test_mixed_restore_targets_only_explicit_data_line_label():
+    source = '''READ A$
+PRINT A$
+RESTORE 100
+READ B$
+PRINT B$
+END
+100 DATA "later"
+''';
+    basic, out = runner(source);
+    assert out == 'later\nlater\n';
