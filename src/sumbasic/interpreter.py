@@ -20,6 +20,7 @@
 #  MA 02110-1301, USA.
 #  
 import re;
+import time;
 from pathlib import Path;
 
 from .channels import ChannelManager, channel_number;
@@ -39,7 +40,7 @@ class _StopProgram(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None):
         self.program = BasicProgram();
         self.variables = {};
         self.variable_types = {};
@@ -50,6 +51,7 @@ class BasicInterpreter:
         self.input_func = input_func;
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
+        self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
         self.expr = ExpressionEvaluator(self.variables, self.variable_types, self.arrays, extra_functions={
             "EOF": lambda channel: self.channels.eof(channel),
             "LOF": lambda channel: self.channels.lof(channel),
@@ -64,7 +66,7 @@ class BasicInterpreter:
             "PEEK": lambda *args: 0,
             "IN": lambda *args: 0,
             "USR": lambda *args: 0,
-        });
+        }, now_func=now_func);
         self.gosub_stack = [];
         self.for_stack = [];
         self.data = [];
@@ -106,6 +108,14 @@ class BasicInterpreter:
         return str(self.expr.eval(text));
 
     def _format_value(self, value):
+        if isinstance(value, complex):
+            real = value.real;
+            imag = value.imag;
+            real_text = str(int(real)) if float(real).is_integer() else str(real);
+            imag_text = str(int(abs(imag))) if float(abs(imag)).is_integer() else str(abs(imag));
+            if imag == 0: return real_text;
+            if real == 0: return ("-" if imag < 0 else "") + imag_text + "i";
+            return real_text + ("-" if imag < 0 else "+") + imag_text + "i";
         if isinstance(value, float) and value.is_integer(): return str(int(value));
         return str(value);
 
@@ -212,6 +222,10 @@ class BasicInterpreter:
             sign = -1 if text.startswith("-") else 1;
             raw = text.lstrip("+-")[2:];
             return sign * int(raw, 8);
+        if re.fullmatch(r"[+-]?&B[01]+", text):
+            sign = -1 if text.startswith("-") else 1;
+            raw = text.lstrip("+-")[2:];
+            return sign * int(raw, 2);
         if re.fullmatch(r"[+-]?\d+", text): return int(text);
         if re.fullmatch(r"[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[Ee][+-]?\d+)?", text) or re.fullmatch(r"[+-]?\d+[Ee][+-]?\d+", text): return float(text);
         return text;
@@ -458,12 +472,21 @@ class BasicInterpreter:
                 if separator == ",": rendered += "\t";
             self._emit(rendered, end="" if trailing else "\n");
             return pc + 1;
-        match = re.match(r"^(LINE\s+INPUT|INPUT)\s*(?:\"([^\"]*)\"\s*[;,])?\s*([A-Za-z_][A-Za-z0-9_]*[$%&!]?)$", text, re.I);
+        match = re.match(r"^(LINE\s+INPUT|INPUT)\s*(?:\"([^\"]*)\"\s*([;,]))?\s*([A-Za-z_][A-Za-z0-9_]*[$%&!]?)$", text, re.I);
         if match:
-            prompt = match.group(2) or ("? " if match.group(1).upper() == "INPUT" else "");
+            command = match.group(1).upper();
+            prompt_text = match.group(2);
+            separator = match.group(3);
+            variable = match.group(4);
+            if command == "INPUT":
+                if prompt_text is None: prompt = "? ";
+                elif separator == ";": prompt = prompt_text + "? ";
+                else: prompt = prompt_text;
+            else:
+                prompt = prompt_text or "";
             raw = self.input_func(prompt);
-            value = str(raw) if match.group(1).upper().startswith("LINE") else self._coerce_input(match.group(3), raw);
-            self._assign_target(match.group(3), value); return pc + 1;
+            value = str(raw) if command.startswith("LINE") else self._coerce_input(variable, raw);
+            self._assign_target(variable, value); return pc + 1;
         match = re.match(r"^IF\s+(.+?)\s+THEN(?:\s+(.*))?$", text, re.I);
         if match:
             condition = bool(self.expr.eval(match.group(1)));
@@ -569,6 +592,15 @@ class BasicInterpreter:
         if match:
             seed = self.expr.eval(match.group(1)) if match.group(1) else None;
             self.expr.random.seed(seed); return pc + 1;
+        match = re.match(r"^PAUSE\s+(.+)$", text, re.I);
+        if match:
+            frames = float(self.expr.eval(match.group(1)));
+            if frames < 0: raise BasicError("PAUSE requires a non-negative frame count");
+            if frames == 0:
+                while not self.inkey_func(): self.sleep_func(0.01);
+            else:
+                self.sleep_func(frames / 50.0);
+            return pc + 1;
         assignment = re.match(r"^(?:LET\s+)?(.+?)\s*=\s*(.+)$", text, re.I);
         if assignment:
             target = assignment.group(1).strip();

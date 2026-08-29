@@ -239,3 +239,210 @@ def test_bare_inkey_function():
     basic.program.load_text('PRINT INKEY$\n');
     basic.run();
     assert ''.join(output) == 'K\n';
+
+
+def test_complete_arithmetic_operator_family():
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert expr.eval('2 + 3 * 4') == 14;
+    assert expr.eval('(2 + 3) * 4') == 20;
+    assert expr.eval('7 / 2') == 3.5;
+    assert expr.eval(r'7\2') == 3;
+    assert expr.eval('7 DIV 2') == 3;
+    assert expr.eval('7 MOD 3') == 1;
+    assert expr.eval('2^8') == 256;
+    assert expr.eval('1 << 5') == 32;
+    assert expr.eval('32 >> 3') == 4;
+    assert expr.eval('5 XOR 3') == 6;
+    assert expr.eval('&B1010 + &H10 + &O10') == 34;
+
+
+def test_relational_and_logical_operators():
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert expr.eval('2 = 2') is True;
+    assert expr.eval('2 <> 3') is True;
+    assert expr.eval('2 < 3') is True;
+    assert expr.eval('2 <= 2') is True;
+    assert expr.eval('3 >= 2') is True;
+    assert expr.eval('3 > 2') is True;
+    assert expr.eval('NOT FALSE') is True;
+    assert expr.eval('TRUE AND FALSE') is False;
+    assert expr.eval('TRUE OR FALSE') is True;
+    assert expr.eval('TRUE XOR FALSE') is True;
+
+
+def test_spectrum_and_extended_transcendental_math():
+    import math;
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert math.isclose(expr.eval('SIN(PI/2)'), 1.0, rel_tol=0.0, abs_tol=1e-6);
+    assert math.isclose(expr.eval('COS(0)'), 1.0);
+    assert math.isclose(expr.eval('TAN(0)'), 0.0);
+    assert math.isclose(expr.eval('ASN(1)'), math.pi / 2);
+    assert math.isclose(expr.eval('ACS(1)'), 0.0);
+    assert math.isclose(expr.eval('ATN(1)'), math.pi / 4);
+    assert math.isclose(expr.eval('ATN2(1,1)'), math.pi / 4);
+    assert math.isclose(expr.eval('LN(EXP(1))'), 1.0);
+    assert math.isclose(expr.eval('LOG10(1000)'), 3.0);
+    assert math.isclose(expr.eval('LOG2(8)'), 3.0);
+    assert math.isclose(expr.eval('LOG(1000)'), 3.0);
+    assert math.isclose(expr.eval('LOGB(81,3)'), 4.0);
+    assert math.isclose(expr.eval('SINH(0)'), 0.0);
+    assert math.isclose(expr.eval('COSH(0)'), 1.0);
+    assert math.isclose(expr.eval('TANH(0)'), 0.0);
+
+
+def test_roots_rounding_and_range_math():
+    import math;
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert expr.eval('SQR(81)') == 9.0;
+    assert math.isclose(expr.eval('CBRT(-8)'), -2.0);
+    assert math.isclose(expr.eval('ROOT(625,4)'), 5.0);
+    assert expr.eval('POW(3,4)') == 81;
+    assert expr.eval('INT(-1.2)') == -2;
+    assert expr.eval('FIX(-1.8)') == -1;
+    assert expr.eval('FLOOR(1.9)') == 1;
+    assert expr.eval('CEIL(1.1)') == 2;
+    assert expr.eval('ROUND(2.5)') == 3;
+    assert expr.eval('ROUND(-2.5)') == -3;
+    assert math.isclose(expr.eval('FRAC(-2.25)'), -0.25);
+    assert expr.eval('MIN(7,3,9)') == 3;
+    assert expr.eval('MAX(7,3,9)') == 9;
+    assert expr.eval('CLAMP(12,0,10)') == 10;
+    assert math.isclose(expr.eval('HYPOT(3,4)'), 5.0);
+
+
+def test_number_theory_combinatorics_and_special_math():
+    import math;
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert expr.eval('GCD(18,24,30)') == 6;
+    assert expr.eval('LCM(6,8)') == 24;
+    assert expr.eval('FACT(6)') == 720;
+    assert expr.eval('COMB(6,2)') == 15;
+    assert expr.eval('PERM(6,2)') == 30;
+    assert math.isclose(expr.eval('GAMMA(6)'), 120.0);
+    assert math.isclose(expr.eval('ERF(0)'), 0.0);
+    assert expr.eval('ISFINITE(1.0)') is True;
+    assert expr.eval('ISINF(1e309)') is True;
+
+
+def test_bitwise_math_functions():
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert expr.eval('BAND(7,3)') == 3;
+    assert expr.eval('BOR(4,1)') == 5;
+    assert expr.eval('BXOR(5,3)') == 6;
+    assert expr.eval('BNOT(0)') == -1;
+    assert expr.eval('SHL(3,4)') == 48;
+    assert expr.eval('SHR(48,4)') == 3;
+    assert expr.eval('IDIV(17,5)') == 3;
+
+
+def test_decimal_mixed_arithmetic_is_promoted_safely():
+    from decimal import Decimal;
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    result = expr.eval('DECIMAL("0.1") + 0.2');
+    assert result == Decimal('0.3');
+
+
+def test_input_prompt_separator_semantics():
+    prompts = [];
+    values = iter(['Ada', '42', 'ok']);
+    output = [];
+    basic = BasicInterpreter(input_func=lambda prompt='': (prompts.append(prompt), next(values))[1], output_func=lambda text, end='\n': output.append(str(text) + end));
+    basic.program.load_text('INPUT "texto"; A$\nINPUT "edad", B!\nINPUT C$\n');
+    basic.run();
+    assert prompts == ['texto? ', 'edad', '? '];
+    assert basic.variables['a$'] == 'Ada';
+    assert basic.variables['b!'] == 42;
+    assert basic.variables['c$'] == 'ok';
+
+
+def test_math_vocabulary_is_append_only_in_asc_space():
+    from sumbasic.vocabulary import ASC_MODERN_CODES;
+    assert ASC_MODERN_CODES[3045] == 'DIV';
+    assert ASC_MODERN_CODES[3076] == 'ROUND';
+    assert ASC_MODERN_CODES[3086] == 'GCD';
+    assert ASC_MODERN_CODES[3114] == 'RTRIM$';
+    assert ASC_MODERN_CODES[3115] == 'COMPLEX';
+    assert ASC_MODERN_CODES[3127] == 'TIME$';
+    assert ASC_MODERN_CODES[3130] == 'LOGBASE';
+
+
+
+def test_log_is_base10_and_ln_is_natural():
+    import math;
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    assert math.isclose(expr.eval('LOG(1000)'), 3.0);
+    assert math.isclose(expr.eval('LOG10(1000)'), 3.0);
+    assert math.isclose(expr.eval('LN(EXP(1))'), 1.0);
+    assert math.isclose(expr.eval('LOGB(81,3)'), 4.0);
+    assert math.isclose(expr.eval('LOGBASE(32,2)'), 5.0);
+
+
+def test_complex_type_and_arithmetic():
+    import cmath;
+    import math;
+    from sumbasic.expressions import ExpressionEvaluator;
+    expr = ExpressionEvaluator();
+    z = expr.eval('COMPLEX(3,4)');
+    assert z == complex(3, 4);
+    assert expr.eval('COMPLEX(3,4) + COMPLEX(1,-2)') == complex(4, 2);
+    assert expr.eval('COMPLEX(3,4) * COMPLEX(1,-2)') == complex(11, -2);
+    assert expr.eval('REAL(COMPLEX(3,4))') == 3.0;
+    assert expr.eval('IMAG(COMPLEX(3,4))') == 4.0;
+    assert expr.eval('CONJ(COMPLEX(3,4))') == complex(3, -4);
+    assert expr.eval('ABS(COMPLEX(3,4))') == 5.0;
+    assert expr.eval('NORM(COMPLEX(3,4))') == 25.0;
+    assert math.isclose(expr.eval('PHASE(COMPLEX(0,1))'), math.pi / 2);
+    assert cmath.isclose(expr.eval('SQR(COMPLEX(-1,0))'), complex(0, 1));
+    assert cmath.isclose(expr.eval('EXP(COMPLEX(0,PI))'), cmath.exp(complex(0, 3.1415927)));
+    assert expr.eval('ISCOMPLEX(COMPLEX(1,2))') is True;
+
+
+def test_complex_declared_type_and_print_format():
+    basic, out = runner('DIM Z AS COMPLEX\nZ=COMPLEX(3,4)\nPRINT Z\nPRINT STR$(CONJ(Z))\n');
+    assert basic.variables['z'] == complex(3, 4);
+    assert out == '3+4i\n3-4i\n';
+
+
+def test_time_string_and_timer_are_deterministic_with_clock_hook():
+    from datetime import datetime;
+    from sumbasic.expressions import ExpressionEvaluator;
+    fixed = datetime(2026, 8, 29, 1, 57, 30, 500000);
+    expr = ExpressionEvaluator(now_func=lambda: fixed);
+    assert expr.eval('TIME$') == '01:57:30';
+    assert expr.eval('TIMER') == 7050.5;
+
+
+def test_time_functions_work_in_program_source():
+    from datetime import datetime;
+    output = [];
+    fixed = datetime(2026, 8, 29, 12, 34, 56, 250000);
+    basic = BasicInterpreter(output_func=lambda text, end='\n': output.append(str(text) + end), now_func=lambda: fixed);
+    basic.program.load_text('PRINT TIME$\nPRINT TIMER\n');
+    basic.run();
+    assert ''.join(output) == '12:34:56\n45296.25\n';
+
+
+def test_pause_uses_spectrum_50hz_frames():
+    sleeps = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, sleep_func=lambda seconds: sleeps.append(seconds));
+    basic.program.load_text('PAUSE 50\nPAUSE 25\n');
+    basic.run();
+    assert sleeps == [1.0, 0.5];
+
+
+def test_retro_clock_example_loads_and_uses_time_font_data():
+    path = Path(__file__).resolve().parents[1] / 'examples' / 'retro_clock.bas';
+    text = path.read_text(encoding='utf-8');
+    assert 'DIM SHARED Font$(9, 6), Colon$(6)' in text;
+    assert 'T$ = TIME$' in text;
+    assert 'TIMER' in text;
+    assert 'PAUSE 50' in text;
+    assert 'DATA " ███ "' in text;

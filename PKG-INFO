@@ -1,11 +1,10 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a3
+Version: 0.1.0a5
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
-License: GPL-2.0-or-later
+License-Expression: GPL-2.0-or-later
 Classifier: Development Status :: 3 - Alpha
-Classifier: License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
 Classifier: Programming Language :: Python :: 3
 Classifier: Topic :: Education
 Requires-Python: >=3.8
@@ -16,11 +15,11 @@ Requires-Dist: sumx>=0.1.6
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a3
+# sumBASIC 0.1.0a5
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
-This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, and a reserved graphics vocabulary whose backend is still pending.
+This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
 
 ## Language identity
 
@@ -80,6 +79,66 @@ prints:
 ```
 
 `PI = 3` is an error.
+
+## Mathematical core
+
+sumBASIC deliberately provides a broader mathematical toolbox than traditional xBase-style languages. Classic BASIC/Spectrum spellings remain available, while modern aliases and additional functions make the same interpreter useful for teaching numerical programming.
+
+Arithmetic operators:
+
+```basic
+PRINT 2 + 3 * 4
+PRINT 7 / 2
+PRINT 7 \ 2
+PRINT 7 DIV 2
+PRINT 7 MOD 3
+PRINT 2 ^ 8
+PRINT 1 << 5
+PRINT 32 >> 3
+PRINT 5 XOR 3
+```
+
+Numeric literals include decimal, scientific notation, hexadecimal `&H`, octal `&O`, and binary `&B` forms. Relational/logical operations include `=`, `<>`, `<`, `<=`, `>=`, `>`, `NOT`, `AND`, `OR`, and `XOR`.
+
+The Spectrum family is supported directly: `SIN`, `COS`, `TAN`, `ASN`, `ACS`, `ATN`, `LN`, `EXP`, `INT`, `SQR`, `SGN`, and `ABS`. `LOG(x)` is the common/base-10 logarithm, while `LN(x)` is the natural/Napierian logarithm. The extended family adds roots/powers, hyperbolic functions, arbitrary-base logarithms through `LOGB`/`LOGBASE`, rounding, angle conversion, number theory, combinatorics, special functions, complex numbers, and explicit bitwise functions. Examples:
+
+```basic
+PRINT ROOT(27, 3)
+PRINT LOG(1000)
+PRINT LN(EXP(1))
+PRINT LOGB(81, 3)
+PRINT ROUND(2.5)
+PRINT GCD(18, 24)
+PRINT COMB(6, 2)
+PRINT BAND(7, 3)
+PRINT DEG(ATN(1))
+```
+
+`ROUND` uses half-away-from-zero semantics, so `ROUND(2.5)` is `3` and `ROUND(-2.5)` is `-3`. `INT` floors toward negative infinity, while `FIX`/`TRUNC` truncate toward zero. Mixed `DECIMAL` arithmetic promotes ordinary numeric operands to `DECIMAL` rather than silently falling back to binary floating point.
+
+See `docs/MATH.md` for the complete alpha mathematical surface and its semantics.
+
+## Complex numbers
+
+Complex values are first-class numbers rather than a library-side workaround:
+
+```basic
+DIM Z AS COMPLEX
+Z = COMPLEX(3, 4)
+PRINT Z                # 3+4i
+PRINT ABS(Z)           # 5
+PRINT REAL(Z); IMAG(Z)
+PRINT CONJ(Z)
+PRINT SQR(COMPLEX(-1, 0))
+```
+
+Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inverse/hyperbolic functions, `LN`, `LOG`, `LOG2`, `LOGB`, `EXP`, `SQR` and `SQRT` accept complex operands. See `examples/complex.bas` and `docs/MATH.md`.
+
+## Clock functions and retro clock demo
+
+`TIME$` returns the local wall-clock time as `HH:MM:SS`. `TIMER` returns seconds since local midnight, including a fractional part when the host clock provides it. `PAUSE n` uses the Spectrum convention of 50 frames per second, so `PAUSE 50` waits approximately one second.
+
+`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. The demo runs for ten seconds by default so it is safe to launch from tests or a shell; its outer `FOR` can be replaced by `DO`/`LOOP` for continuous display.
 
 ## DATA, READ and RESTORE
 
@@ -185,7 +244,29 @@ PRINT Name$
 NEXT Name$
 ```
 
-The type vocabulary currently includes `BOOLEAN`, `INTEGER`, `LONG`, `SINGLE`, `DOUBLE`, `DECIMAL`, `STRING`, `BYTES`, `ANY`, `LIST`, `DICT`, `SET` and `TUPLE`. Typed generic forms such as `LIST[STRING]` are reserved by the type parser; deeper element-type enforcement will evolve in later alphas.
+The type vocabulary currently includes `BOOLEAN`, `INTEGER`, `LONG`, `SINGLE`, `DOUBLE`, `DECIMAL`, `COMPLEX`, `STRING`, `BYTES`, `ANY`, `LIST`, `DICT`, `SET` and `TUPLE`. Typed generic forms such as `LIST[STRING]` are reserved by the type parser; deeper element-type enforcement will evolve in later alphas.
+
+## Interactive INPUT prompts
+
+The separator after an `INPUT` prompt is meaningful:
+
+```basic
+INPUT "texto"; Value$
+```
+
+shows `texto? ` followed by the live input cursor, while:
+
+```basic
+INPUT "texto", Value$
+```
+
+shows `texto` directly followed by the input cursor. With no explicit prompt:
+
+```basic
+INPUT Value$
+```
+
+shows `? ` followed by the cursor. The cursor itself belongs to the active frontend and is not a literal underscore emitted by the language.
 
 ## Graphics vocabulary
 
@@ -240,7 +321,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a3.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a5.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
@@ -262,7 +343,7 @@ sumbasic --check program.bas
 
 ## Tests
 
-The alpha includes 29 regression tests covering the existing interpreter plus the new PI, comments, suffixes, `RESTORE` targeting, multidimensional arrays, modern containers, `FOR EACH`, graphics stubs and `INKEY$` hook.
+The alpha includes 38 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
 
 ## License
 

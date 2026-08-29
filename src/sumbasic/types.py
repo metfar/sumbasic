@@ -31,7 +31,7 @@ SUFFIX_TYPES = {
 };
 
 SCALAR_TYPES = {
-    "ANY", "BOOLEAN", "INTEGER", "LONG", "SINGLE", "DOUBLE", "DECIMAL", "STRING", "BYTES",
+    "ANY", "BOOLEAN", "INTEGER", "LONG", "SINGLE", "DOUBLE", "DECIMAL", "COMPLEX", "STRING", "BYTES",
 };
 
 COLLECTION_TYPES = {"ARRAY", "LIST", "DICT", "SET", "TUPLE"};
@@ -61,6 +61,7 @@ def normalize_type(type_name):
         "BOOL": "BOOLEAN",
         "INT": "INTEGER",
         "FLOAT": "DOUBLE",
+        "CPLX": "COMPLEX",
         "STR": "STRING",
         "BYTE": "BYTES",
     };
@@ -82,6 +83,7 @@ def default_value(type_name):
     if kind in ("INTEGER", "LONG"): return 0;
     if kind in ("SINGLE", "DOUBLE"): return 0.0;
     if kind == "DECIMAL": return Decimal("0");
+    if kind == "COMPLEX": return complex(0.0, 0.0);
     if kind == "BYTES": return b"";
     if kind == "LIST": return [];
     if kind == "DICT": return {};
@@ -98,6 +100,13 @@ def coerce_value(value, type_name):
     if kind in ("INTEGER", "LONG"): return int(float(value));
     if kind in ("SINGLE", "DOUBLE"): return float(value);
     if kind == "DECIMAL": return Decimal(str(value));
+    if kind == "COMPLEX":
+        if isinstance(value, complex): return value;
+        if isinstance(value, (tuple, list)) and len(value) == 2: return complex(float(value[0]), float(value[1]));
+        if isinstance(value, str):
+            text = value.strip().replace("I", "j").replace("i", "j");
+            return complex(text);
+        return complex(value);
     if kind == "BYTES":
         if isinstance(value, bytes): return value;
         if isinstance(value, bytearray): return bytes(value);

@@ -20,9 +20,12 @@
 #  MA 02110-1301, USA.
 #  
 import ast;
+import cmath;
 import math;
 import random;
 import re;
+from datetime import datetime;
+from decimal import Decimal;
 
 from .types import coerce_value, suffix_type;
 from .vocabulary import ZX_SPECTRUM_PI;
@@ -33,17 +36,131 @@ class BasicExpressionError(RuntimeError):
 
 
 class ExpressionEvaluator:
-    def __init__(self, variables=None, variable_types=None, arrays=None, extra_functions=None):
+    def __init__(self, variables=None, variable_types=None, arrays=None, extra_functions=None, now_func=None):
         self.variables = variables if variables is not None else {};
         self.variable_types = variable_types if variable_types is not None else {};
         self.arrays = arrays if arrays is not None else {};
         self.extra_functions = extra_functions if extra_functions is not None else {};
+        self.now_func = now_func if now_func is not None else datetime.now;
         self.random = random.Random();
         self._encoded_names = {};
 
     @staticmethod
     def key(name):
         return str(name).casefold();
+
+    @staticmethod
+    def _basic_round(value, digits=0):
+        digits = int(digits);
+        scale = 10.0 ** digits;
+        scaled = float(value) * scale;
+        rounded = math.floor(scaled + 0.5) if scaled >= 0 else math.ceil(scaled - 0.5);
+        result = rounded / scale;
+        return int(result) if digits == 0 else result;
+
+    @staticmethod
+    def _root(value, degree=2):
+        degree_value = float(degree);
+        if degree_value == 0: raise BasicExpressionError("ROOT degree cannot be zero");
+        if isinstance(value, complex): return value ** (1.0 / degree_value);
+        value = float(value);
+        if value < 0:
+            degree_int = int(degree_value);
+            if degree_value != degree_int or degree_int % 2 == 0: raise BasicExpressionError("ROOT domain error");
+            return -((-value) ** (1.0 / degree_int));
+        return value ** (1.0 / degree_value);
+
+    @staticmethod
+    def _cbrt(value):
+        if isinstance(value, complex): return value ** (1.0 / 3.0);
+        value = float(value);
+        return math.copysign(abs(value) ** (1.0 / 3.0), value);
+
+    @staticmethod
+    def _frac(value):
+        value = float(value);
+        return value - math.trunc(value);
+
+    @staticmethod
+    def _clamp(value, low, high):
+        if low > high: raise BasicExpressionError("CLAMP lower bound is greater than upper bound");
+        return max(low, min(high, value));
+
+    @staticmethod
+    def _band(*values):
+        if not values: return 0;
+        result = int(values[0]);
+        for value in values[1:]: result &= int(value);
+        return result;
+
+    @staticmethod
+    def _bor(*values):
+        if not values: return 0;
+        result = int(values[0]);
+        for value in values[1:]: result |= int(value);
+        return result;
+
+    @staticmethod
+    def _bxor(*values):
+        if not values: return 0;
+        result = int(values[0]);
+        for value in values[1:]: result ^= int(value);
+        return result;
+
+    @staticmethod
+    def _numeric_pair(first, second):
+        if isinstance(first, complex) or isinstance(second, complex):
+            return complex(first), complex(second);
+        if isinstance(first, Decimal) or isinstance(second, Decimal):
+            if not isinstance(first, Decimal): first = Decimal(str(first));
+            if not isinstance(second, Decimal): second = Decimal(str(second));
+        return first, second;
+
+    @staticmethod
+    def _real_or_complex(value, real_function, complex_function):
+        return complex_function(value) if isinstance(value, complex) else real_function(value);
+
+    @staticmethod
+    def _log_base(value, base):
+        if isinstance(value, complex) or isinstance(base, complex):
+            return cmath.log(value) / cmath.log(base);
+        return math.log(value, base);
+
+    def _time_string(self):
+        return self.now_func().strftime("%H:%M:%S");
+
+    def _timer_value(self):
+        now = self.now_func();
+        return (now.hour * 3600) + (now.minute * 60) + now.second + (now.microsecond / 1000000.0);
+
+    @staticmethod
+    def _complex_sign(value):
+        if isinstance(value, complex):
+            magnitude = abs(value);
+            return 0 if magnitude == 0 else value / magnitude;
+        return -1 if value < 0 else (1 if value > 0 else 0);
+
+    @staticmethod
+    def _complex_predicate(value, real_predicate):
+        if isinstance(value, complex): return real_predicate(value.real) or real_predicate(value.imag);
+        return real_predicate(value);
+
+    @staticmethod
+    def _finite_predicate(value):
+        if isinstance(value, complex): return math.isfinite(value.real) and math.isfinite(value.imag);
+        return math.isfinite(value);
+
+    @staticmethod
+    def _basic_string(value):
+        if isinstance(value, complex):
+            real = value.real;
+            imag = value.imag;
+            real_text = str(int(real)) if float(real).is_integer() else str(real);
+            imag_text = str(int(abs(imag))) if float(abs(imag)).is_integer() else str(abs(imag));
+            if imag == 0: return real_text;
+            if real == 0: return ("-" if imag < 0 else "") + imag_text + "i";
+            return real_text + ("-" if imag < 0 else "+") + imag_text + "i";
+        return str(value);
 
     def get(self, name):
         upper = str(name).upper();
@@ -69,19 +186,80 @@ class ExpressionEvaluator:
         upper = name.upper();
         table = {
             "ABS": lambda x: abs(x),
-            "ASN": lambda x: math.asin(x),
-            "ACS": lambda x: math.acos(x),
-            "ATN": lambda x: math.atan(x),
-            "COS": lambda x: math.cos(x),
-            "EXP": lambda x: math.exp(x),
-            "FIX": lambda x: math.trunc(x),
+            "SGN": lambda x: self._complex_sign(x),
+            "SIGN": lambda x: self._complex_sign(x),
+            "SQR": lambda x: self._real_or_complex(x, math.sqrt, cmath.sqrt),
+            "SQRT": lambda x: self._real_or_complex(x, math.sqrt, cmath.sqrt),
+            "CBRT": lambda x: self._cbrt(x),
+            "ROOT": lambda x, n=2: self._root(x, n),
+            "POW": lambda x, y: x ** y,
+            "SQUARE": lambda x: x * x,
+            "CUBE": lambda x: x * x * x,
+            "SIN": lambda x: self._real_or_complex(x, math.sin, cmath.sin),
+            "COS": lambda x: self._real_or_complex(x, math.cos, cmath.cos),
+            "TAN": lambda x: self._real_or_complex(x, math.tan, cmath.tan),
+            "COT": lambda x: 1.0 / self._real_or_complex(x, math.tan, cmath.tan),
+            "SEC": lambda x: 1.0 / self._real_or_complex(x, math.cos, cmath.cos),
+            "CSC": lambda x: 1.0 / self._real_or_complex(x, math.sin, cmath.sin),
+            "ASN": lambda x: self._real_or_complex(x, math.asin, cmath.asin),
+            "ASIN": lambda x: self._real_or_complex(x, math.asin, cmath.asin),
+            "ACS": lambda x: self._real_or_complex(x, math.acos, cmath.acos),
+            "ACOS": lambda x: self._real_or_complex(x, math.acos, cmath.acos),
+            "ATN": lambda x: self._real_or_complex(x, math.atan, cmath.atan),
+            "ATAN": lambda x: self._real_or_complex(x, math.atan, cmath.atan),
+            "ATN2": lambda y, x: math.atan2(y, x),
+            "ATAN2": lambda y, x: math.atan2(y, x),
+            "SINH": lambda x: self._real_or_complex(x, math.sinh, cmath.sinh),
+            "COSH": lambda x: self._real_or_complex(x, math.cosh, cmath.cosh),
+            "TANH": lambda x: self._real_or_complex(x, math.tanh, cmath.tanh),
+            "ASNH": lambda x: self._real_or_complex(x, math.asinh, cmath.asinh),
+            "ASINH": lambda x: self._real_or_complex(x, math.asinh, cmath.asinh),
+            "ACSH": lambda x: self._real_or_complex(x, math.acosh, cmath.acosh),
+            "ACOSH": lambda x: self._real_or_complex(x, math.acosh, cmath.acosh),
+            "ATNH": lambda x: self._real_or_complex(x, math.atanh, cmath.atanh),
+            "ATANH": lambda x: self._real_or_complex(x, math.atanh, cmath.atanh),
+            "LN": lambda x: self._real_or_complex(x, math.log, cmath.log),
+            "LOG": lambda x: self._real_or_complex(x, math.log10, cmath.log10),
+            "LOGB": lambda x, base: self._log_base(x, base),
+            "LOGBASE": lambda x, base: self._log_base(x, base),
+            "LOG10": lambda x: self._real_or_complex(x, math.log10, cmath.log10),
+            "LOG2": lambda x: self._log_base(x, 2),
+            "EXP": lambda x: self._real_or_complex(x, math.exp, cmath.exp),
             "INT": lambda x: math.floor(x),
-            "LN": lambda x: math.log(x),
-            "LOG": lambda x: math.log(x),
-            "SGN": lambda x: -1 if x < 0 else (1 if x > 0 else 0),
-            "SIN": lambda x: math.sin(x),
-            "SQR": lambda x: math.sqrt(x),
-            "TAN": lambda x: math.tan(x),
+            "FIX": lambda x: math.trunc(x),
+            "TRUNC": lambda x: math.trunc(x),
+            "FLOOR": lambda x: math.floor(x),
+            "CEIL": lambda x: math.ceil(x),
+            "ROUND": lambda x, digits=0: self._basic_round(x, digits),
+            "FRAC": lambda x: self._frac(x),
+            "MIN": lambda *values: min(values),
+            "MAX": lambda *values: max(values),
+            "CLAMP": lambda x, low, high: self._clamp(x, low, high),
+            "HYPOT": lambda *values: math.hypot(*values),
+            "RAD": lambda x: math.radians(x),
+            "RADIANS": lambda x: math.radians(x),
+            "DEG": lambda x: math.degrees(x),
+            "DEGREES": lambda x: math.degrees(x),
+            "GCD": lambda *values: math.gcd(*(int(value) for value in values)),
+            "LCM": lambda *values: math.lcm(*(int(value) for value in values)),
+            "FACT": lambda x: math.factorial(int(x)),
+            "FACTORIAL": lambda x: math.factorial(int(x)),
+            "COMB": lambda n, k: math.comb(int(n), int(k)),
+            "PERM": lambda n, k=None: math.perm(int(n), None if k is None else int(k)),
+            "GAMMA": lambda x: math.gamma(x),
+            "LGAMMA": lambda x: math.lgamma(x),
+            "ERF": lambda x: math.erf(x),
+            "ERFC": lambda x: math.erfc(x),
+            "ISFINITE": lambda x: self._finite_predicate(x),
+            "ISINF": lambda x: self._complex_predicate(x, math.isinf),
+            "ISNAN": lambda x: self._complex_predicate(x, math.isnan),
+            "BAND": lambda *values: self._band(*values),
+            "BOR": lambda *values: self._bor(*values),
+            "BXOR": lambda *values: self._bxor(*values),
+            "BNOT": lambda x: ~int(x),
+            "SHL": lambda x, n: int(x) << int(n),
+            "SHR": lambda x, n: int(x) >> int(n),
+            "IDIV": lambda x, y: x // y,
             "LEN": lambda x: len(x) if hasattr(x, "__len__") else len(str(x)),
             "ASC": lambda x: ord(str(x)[0]) if str(x) else 0,
             "CODE": lambda x: ord(str(x)[0]) if str(x) else 0,
@@ -93,12 +271,27 @@ class ExpressionEvaluator:
             "LTRIM$": lambda x: str(x).lstrip(),
             "RTRIM$": lambda x: str(x).rstrip(),
             "SPACE$": lambda n: " " * int(n),
-            "STR$": lambda x: str(x),
+            "STR$": lambda x: self._basic_string(x),
             "VAL": lambda x: float(str(x).strip()) if any(c in str(x) for c in ".eE") else int(str(x).strip() or "0"),
             "VAL$": lambda x: str(x),
             "BIN": lambda x: format(int(x), "b"),
             "HEX$": lambda x: format(int(x), "X"),
             "OCT$": lambda x: format(int(x), "o"),
+            "DECIMAL": lambda x=0: Decimal(str(x)),
+            "COMPLEX": lambda real=0, imag=0: complex(real, imag),
+            "CMPLX": lambda real=0, imag=0: complex(real, imag),
+            "REAL": lambda z: complex(z).real,
+            "IMAG": lambda z: complex(z).imag,
+            "CONJ": lambda z: complex(z).conjugate(),
+            "CONJUGATE": lambda z: complex(z).conjugate(),
+            "PHASE": lambda z: cmath.phase(complex(z)),
+            "ARG": lambda z: cmath.phase(complex(z)),
+            "MAG": lambda z: abs(z),
+            "NORM": lambda z: abs(z) ** 2,
+            "POLAR": lambda radius, angle: cmath.rect(radius, angle),
+            "ISCOMPLEX": lambda z: isinstance(z, complex),
+            "TIME$": lambda: self._time_string(),
+            "TIMER": lambda: self._timer_value(),
         };
         if upper == "RND": return self.random.random();
         if upper == "MID$":
@@ -118,7 +311,10 @@ class ExpressionEvaluator:
             value = args[1];
             char = chr(int(value) & 0xff) if isinstance(value, (int, float)) else str(value)[:1];
             return char * n;
-        if upper in table: return table[upper](*args);
+        if upper in table:
+            try: return table[upper](*args);
+            except BasicExpressionError: raise;
+            except (ArithmeticError, TypeError, ValueError, OverflowError) as exc: raise BasicExpressionError("{}: {}".format(upper, exc)) from exc;
         if upper in self.extra_functions: return self.extra_functions[upper](*args);
         raise BasicExpressionError("Unknown function: {}".format(name));
 
@@ -131,18 +327,25 @@ class ExpressionEvaluator:
         return re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*[$%&!]", encode_suffix, segment);
 
     def _transform(self, segment, encoded):
-        segment = re.sub(r"<>", "!=", segment);
-        segment = re.sub(r"(?<![<>=])=(?!=)", "==", segment);
+        segment = re.sub(r"\bXOR\b", " __SUMBASIC_XOR__ ", segment, flags=re.I);
+        segment = re.sub(r"<>", " != ", segment);
+        segment = re.sub(r"(?<![<>=!])=(?!=)", "==", segment);
         segment = re.sub(r"\bAND\b", " and ", segment, flags=re.I);
         segment = re.sub(r"\bOR\b", " or ", segment, flags=re.I);
         segment = re.sub(r"\bNOT\b", " not ", segment, flags=re.I);
         segment = re.sub(r"\bMOD\b", " % ", segment, flags=re.I);
+        segment = re.sub(r"\bDIV\b", " // ", segment, flags=re.I);
+        segment = re.sub(r"\\", "//", segment);
         segment = re.sub(r"\bDB\.(RECNO|RECCOUNT)\s*\(", lambda m: "DB" + m.group(1).upper() + "(", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])RND(?!\s*\()", "RND()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])INKEY\$(?!\s*\()", "INKEY$()", segment, flags=re.I);
+        segment = re.sub(r"(?<![A-Za-z0-9_])TIME\$(?!\s*\()", "TIME$()", segment, flags=re.I);
+        segment = re.sub(r"(?<![A-Za-z0-9_])TIMER(?![A-Za-z0-9_$%&!]|\s*\()", "TIMER()", segment, flags=re.I);
         segment = segment.replace("^", "**");
+        segment = segment.replace("__SUMBASIC_XOR__", "^");
         segment = re.sub(r"&H([0-9A-Fa-f]+)", lambda m: str(int(m.group(1), 16)), segment);
         segment = re.sub(r"&O([0-7]+)", lambda m: str(int(m.group(1), 8)), segment);
+        segment = re.sub(r"&B([01]+)", lambda m: str(int(m.group(1), 2)), segment);
         return self._encode_suffix_names(segment, encoded);
 
     def eval(self, source):
@@ -167,7 +370,7 @@ class ExpressionEvaluator:
             else:
                 current.append(char);
         if current: pieces.append("".join(current) if quote else self._transform("".join(current), encoded));
-        text = "".join(pieces);
+        text = "".join(pieces).strip();
         self._encoded_names = encoded;
         try:
             tree = ast.parse(text, mode="eval");
@@ -193,16 +396,20 @@ class ExpressionEvaluator:
         if isinstance(node, ast.BinOp):
             a = self._node(node.left);
             b = self._node(node.right);
+            first, second = self._numeric_pair(a, b);
             ops = {
-                ast.Add: lambda: a + b,
-                ast.Sub: lambda: a - b,
-                ast.Mult: lambda: a * b,
-                ast.Div: lambda: a / b,
-                ast.FloorDiv: lambda: a // b,
-                ast.Mod: lambda: a % b,
-                ast.Pow: lambda: a ** b,
+                ast.Add: lambda: first + second,
+                ast.Sub: lambda: first - second,
+                ast.Mult: lambda: first * second,
+                ast.Div: lambda: first / second,
+                ast.FloorDiv: lambda: first // second,
+                ast.Mod: lambda: first % second,
+                ast.Pow: lambda: first ** second,
                 ast.LShift: lambda: int(a) << int(b),
                 ast.RShift: lambda: int(a) >> int(b),
+                ast.BitXor: lambda: (bool(a) ^ bool(b)) if isinstance(a, bool) and isinstance(b, bool) else (int(a) ^ int(b)),
+                ast.BitAnd: lambda: int(a) & int(b),
+                ast.BitOr: lambda: int(a) | int(b),
             };
             for kind, function in ops.items():
                 if isinstance(node.op, kind): return function();
@@ -211,6 +418,7 @@ class ExpressionEvaluator:
             if isinstance(node.op, ast.USub): return -value;
             if isinstance(node.op, ast.UAdd): return +value;
             if isinstance(node.op, ast.Not): return not value;
+            if isinstance(node.op, ast.Invert): return ~int(value);
         if isinstance(node, ast.BoolOp):
             values = [bool(self._node(item)) for item in node.values];
             return all(values) if isinstance(node.op, ast.And) else any(values);

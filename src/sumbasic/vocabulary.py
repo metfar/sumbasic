@@ -46,7 +46,7 @@ ASC_BASIC_CODES = {
     652: "CREATE-SCR", 653: "SELECT-SCR", 654: "WRITE-SCR", 655: "REPRESENT-SCR",
 };
 
-# Appended to the supplied ASC table in asc_h-sumbasic-0.1.0a3.py so no
+# Appended to the supplied ASC table in asc_h-sumbasic-0.1.0a5.py so no
 # historical index is shifted.  The supplied table contained 2990 entries.
 ASC_MODERN_START = 2990;
 ASC_MODERN_WORDS = [
@@ -55,6 +55,14 @@ ASC_MODERN_WORDS = [
     "WHILE", "WEND", "DO", "LOOP", "UNTIL", "SWAP", "LOCATE", "FIELD", "GET", "PUT", "WRITE", "FREEFILE", "EOF", "LOF",
     "LOC", "STDIN", "STDOUT", "STDERR", "CHANNEL", "SELECT CASE", "CASE", "END SELECT", "MOD", "XOR", "TRUE", "FALSE", "SCREEN",
     "LBOUND", "UBOUND", "END",
+    "DIV", "FIX", "LOG", "SQRT", "CBRT", "ROOT", "POW", "SQUARE", "CUBE", "COT", "SEC", "CSC",
+    "ASIN", "ACOS", "ATAN", "ATN2", "ATAN2", "SINH", "COSH", "TANH", "ASNH", "ACSH", "ATNH", "ASINH",
+    "ACOSH", "ATANH", "LOG10", "LOG2", "TRUNC", "FLOOR", "CEIL", "ROUND", "FRAC", "MIN", "MAX", "CLAMP",
+    "HYPOT", "RAD", "RADIANS", "DEG", "DEGREES", "GCD", "LCM", "FACT", "FACTORIAL", "COMB", "PERM", "GAMMA",
+    "LGAMMA", "ERF", "ERFC", "ISFINITE", "ISINF", "ISNAN", "BAND", "BOR", "BXOR", "BNOT", "SHL", "SHR",
+    "IDIV", "SIGN", "HEX$", "OCT$", "INSTR", "STRING$", "LCASE$", "UCASE$", "LTRIM$", "RTRIM$",
+    "COMPLEX", "CMPLX", "REAL", "IMAG", "CONJ", "CONJUGATE", "PHASE", "ARG", "MAG", "NORM", "POLAR", "ISCOMPLEX",
+    "TIME$", "TIMER", "LOGB", "LOGBASE",
 ];
 ASC_MODERN_CODES = {ASC_MODERN_START + index: word for index, word in enumerate(ASC_MODERN_WORDS)};
 
