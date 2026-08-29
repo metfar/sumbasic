@@ -1,4 +1,4 @@
-# sumBASIC 0.1.0a9
+# sumBASIC 0.1.0a10
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -21,6 +21,17 @@ PRINT "after"
 ```
 
 This prints `before`, `target`, and `after`. In a **hybrid** source file the numeric line is a jump label at that physical position; it does not reorder the surrounding unnumbered source. Fully numbered classic programs continue to execute in numeric line-number order. This lets teaching examples mix structured/free-form BASIC with `GOTO`, `GOSUB`, and line-aware `RESTORE` when demonstrating historical control flow.
+
+Free-form code can also use case-insensitive named labels without consuming a line number:
+
+```basic
+:LOOP
+A$ = INKEY$
+IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
+GOTO LOOP
+```
+
+A named label may also identify a DATA block for `RESTORE FontData`. A leading `:Name` defines a label; ordinary colons elsewhere remain statement separators, so `BEEP .1, 0: PAUSE 45` is valid.
 
 Comments have three forms:
 
@@ -135,11 +146,11 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 `TIME$` returns the local wall-clock time as `HH:MM:SS`. `TIMER` returns seconds since local midnight, including a fractional part when the host clock provides it. `PAUSE n` uses the Spectrum convention of 50 frames per second, so `PAUSE 50` waits approximately one second.
 
-`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. The demo runs for ten seconds by default so it is safe to launch from tests or a shell; its outer `FOR` can be replaced by `DO`/`LOOP` for continuous display.
+`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. It now runs continuously and exits when Escape, `Q`, or `q` is pressed. Each update plays `BEEP .1, 0`; because `BEEP` is blocking and Spectrum `PAUSE` is measured at 50 ticks per second, `PAUSE 45` contributes 0.9 seconds for an approximately one-second clock cadence.
 
 ## IDE execution
 
-Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` executes the **current editor buffer**, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into the run pane as it is produced. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences.
+Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` executes the **current editor buffer**, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into the run pane as it is produced. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source; `F6` remains the explicit stop key.
 
 ```text
 F2   Save
@@ -343,7 +354,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a9.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a10.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

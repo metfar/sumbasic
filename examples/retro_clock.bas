@@ -1,8 +1,7 @@
 # Retro digital clock for sumBASIC.
 # TIME$ supplies HH:MM:SS. TIMER is seconds since local midnight.
 # The bitmap font is loaded once from DATA into DIM SHARED arrays.
-# This demo runs for ten seconds; replace the outer FOR/NEXT with DO/LOOP
-# when a continuously running clock is wanted.
+# The clock runs until Escape, Q or q is pressed in the IDE.
 
 DIM SHARED Font$(9, 6), Colon$(6)
 
@@ -16,31 +15,33 @@ FOR Row! = 0 TO 6
     READ Colon$(Row!)
 NEXT Row!
 
-FOR Tick! = 1 TO 10
-    T$ = TIME$
-    CLS
+:LOOP
+T$ = TIME$
+CLS
 
-    FOR Row! = 0 TO 6
-        Line$ = ""
-        FOR Pos! = 1 TO 8
-            C$ = MID$(T$, Pos!, 1)
-            IF C$ = ":" THEN
-                Line$ = Line$ + Colon$(Row!) + " "
-            ELSE
-                Digit! = VAL(C$)
-                Line$ = Line$ + Font$(Digit!, Row!) + " "
-            END IF
-        NEXT Pos!
-        LOCATE Row! + 4, 20
-        PRINT Line$
-    NEXT Row!
+FOR Row! = 0 TO 6
+    Line$ = ""
+    FOR Pos! = 1 TO 8
+        C$ = MID$(T$, Pos!, 1)
+        IF C$ = ":" THEN
+            Line$ = Line$ + Colon$(Row!) + " "
+        ELSE
+            Digit! = VAL(C$)
+            Line$ = Line$ + Font$(Digit!, Row!) + " "
+        END IF
+    NEXT Pos!
+    LOCATE Row! + 4, 20
+    PRINT Line$
+NEXT Row!
 
-    LOCATE 13, 20
-    PRINT "TIME$ = "; T$; "   TIMER = "; INT(TIMER)
-    PAUSE 50
-NEXT Tick!
+LOCATE 13, 20
+PRINT "TIME$ = "; T$; "   TIMER = "; INT(TIMER)
 
-END
+# BEEP blocks for .1 s. PAUSE uses Spectrum 50 Hz ticks, so 45 ticks
+# contribute another .9 s: approximately one update/beep per second.
+BEEP .1, 0: PAUSE 45
+A$ = INKEY$: IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
+GOTO LOOP
 
 # 0
 DATA " ███ ", "█   █", "█  ██", "█ █ █", "██  █", "█   █", " ███ "

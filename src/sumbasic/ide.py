@@ -19,10 +19,12 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 #  
+import queue;
 import re;
 import threading;
 
 from sumtui import FunctionAction, Menu, MenuItem, Panel, TextView, VBox;
+from sumtui.events import Key, KeyEvent;
 from sumtui.tools.edit import EditApp;
 
 from .interpreter import BasicError, BasicInterpreter;
@@ -126,6 +128,7 @@ class SumBasicIDE(EditApp):
         self._run_finished = False;
         self._run_error = None;
         self._run_lock = threading.Lock();
+        self._inkey_queue = queue.Queue();
         self.basic_interpreter = interpreter;
         super().__init__(path=path, theme=theme, **kwargs);
         self.output_view = TextView("Ready. Press F5 to run the current editor buffer.");
@@ -134,9 +137,12 @@ class SumBasicIDE(EditApp):
         self.desktop.body = body;
         self.app.set_root(self.desktop);
         if self.basic_interpreter is None:
-            self.basic_interpreter = BasicInterpreter(input_func=self._ide_input, output_func=self._basic_output);
+            self.basic_interpreter = BasicInterpreter(input_func=self._ide_input, output_func=self._basic_output, inkey_func=self._ide_inkey);
         else:
             self.basic_interpreter.output_func = self._basic_output;
+            self.basic_interpreter.inkey_func = self._ide_inkey;
+        self._application_dispatch = self.app.dispatch;
+        self.app.dispatch = self._dispatch_event;
         self.app.add_idle(self._poll_run_state);
         self._update_status();
 
@@ -177,7 +183,28 @@ class SumBasicIDE(EditApp):
     def _ide_input(self, prompt=""):
         raise BasicError("Interactive INPUT from the source IDE is not implemented yet; run this program in the sumBASIC console for interactive input");
 
+    def _ide_inkey(self):
+        try: return self._inkey_queue.get_nowait();
+        except queue.Empty: return "";
+
+    def _queue_program_key(self, value):
+        if value:
+            self._inkey_queue.put(str(value));
+        return True;
+
+    def _dispatch_event(self, event):
+        running = self._run_thread is not None and self._run_thread.is_alive();
+        if running and isinstance(event, KeyEvent):
+            if event.key == Key.ESCAPE:
+                return self._queue_program_key(chr(27));
+            if event.text and not event.ctrl and not event.alt:
+                return self._queue_program_key(event.text);
+        return self._application_dispatch(event);
+
     def _prepare_run(self):
+        while True:
+            try: self._inkey_queue.get_nowait();
+            except queue.Empty: break;
         with self._run_lock:
             self._basic_output_buffer = "";
             self._run_dirty = True;

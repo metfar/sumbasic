@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0a10
+
+- Added free-form named labels using `:Name`; `GOTO Name` and `GOSUB Name` are case-insensitive and coexist with classic numeric line targets.
+- Added `RESTORE Name`, targeting the first `DATA` at or after a named label, so data blocks can be named without requiring classic line numbers.
+- Kept colon as a statement separator, so forms such as `BEEP .1, 0: PAUSE 45` execute left-to-right on one source line.
+- Updated `examples/retro_clock.bas` to run continuously until Escape, `Q`, or `q`, using `:LOOP`, `INKEY$`, and `GOTO LOOP` instead of a fixed `FOR` count.
+- The retro clock now emits `BEEP .1, 0` once per update. Because BEEP blocks for 0.1 s and Spectrum `PAUSE` uses 50 Hz ticks, the example uses `PAUSE 45` (0.9 s) for an approximately one-second cadence.
+- The source IDE now routes printable keys and Escape to the running BASIC program's non-blocking `INKEY$` queue instead of inserting those keys into the editor while F5 execution is active. F6 remains the explicit emergency stop.
+- Added regression coverage for named labels, named RESTORE, colon-separated BEEP/PAUSE timing, the clock-style INKEY$ exit loop, and IDE Q/Escape routing.
+- No ASC indices changed in this release; named labels and IDE key routing are syntax/frontend behavior rather than new BASIC vocabulary tokens.
+
 ## 0.1.0a9
 
 - Fixed hybrid free-form/classic line-number execution. A numeric line such as `10 PRINT ...` inside otherwise unnumbered source is now kept at its physical position and acts as a classic `GOTO`/`GOSUB` target instead of causing all unnumbered statements to be moved after it.

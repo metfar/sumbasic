@@ -211,16 +211,31 @@ class BasicInterpreter:
         execution = [];
         line_to_pc = {};
         self.execution_label_by_pc = {};
+        self.execution_named_label_by_pc = {};
+        self.named_label_pc = {};
+        pending_named = [];
         for number, source, explicit_label in self.program.execution_records():
             first_pc = len(execution);
             if explicit_label is not None:
                 line_to_pc[int(explicit_label)] = first_pc;
             clean = self._strip_comment(source);
+            label_match = re.match(r"^\s*:([A-Za-z_][A-Za-z0-9_]*)(?::|$)(.*)$", clean);
+            if label_match:
+                label = label_match.group(1).upper();
+                if label in line_to_pc:
+                    raise BasicError("Duplicate label {}".format(label));
+                line_to_pc[label] = len(execution);
+                self.named_label_pc[label] = len(execution);
+                pending_named.append(label);
+                clean = (label_match.group(2) or "").strip();
             for statement in self._split_colon(clean):
                 statement_pc = len(execution);
                 execution.append((int(number), statement));
                 if explicit_label is not None:
                     self.execution_label_by_pc[statement_pc] = int(explicit_label);
+                if pending_named:
+                    self.execution_named_label_by_pc[statement_pc] = tuple(pending_named);
+                    pending_named = [];
         return execution, line_to_pc;
 
     def _parse_data_value(self, source):
@@ -246,13 +261,20 @@ class BasicInterpreter:
     def _scan_data(self, execution):
         data = [];
         lines = {};
+        data_positions = [];
         for pc, (_, statement) in enumerate(execution):
             match = re.match(r"^DATA(?:\s+(.*))?$", statement, re.I);
             if not match: continue;
             explicit_label = getattr(self, "execution_label_by_pc", {}).get(pc);
             if explicit_label is not None and explicit_label not in lines:
                 lines[explicit_label] = len(data);
+            data_positions.append((pc, len(data)));
             for item in self._split_top_level(match.group(1) or "", separators=",", keep_empty=True): data.append(self._parse_data_value(item));
+        for label, label_pc in getattr(self, "named_label_pc", {}).items():
+            for data_pc, data_index in data_positions:
+                if data_pc >= label_pc:
+                    lines[label] = data_index;
+                    break;
         self.data = data;
         self.data_line_index = lines;
         self.data_index = 0;
@@ -307,9 +329,12 @@ class BasicInterpreter:
         return mapping;
 
     def _jump_line(self, target, line_to_pc):
-        number = int(target);
-        if number not in line_to_pc: raise BasicError("Undefined line {}".format(number));
-        return line_to_pc[number];
+        raw = str(target).strip();
+        key = int(raw) if re.fullmatch(r"\d+", raw) else raw.upper();
+        if key not in line_to_pc:
+            kind = "line" if isinstance(key, int) else "label";
+            raise BasicError("Undefined {} {}".format(kind, raw));
+        return line_to_pc[key];
 
     def _parse_dimensions(self, source):
         bounds = [];
@@ -382,8 +407,14 @@ class BasicInterpreter:
         if target is None or str(target).strip() == "":
             self.data_index = 0;
             return;
+        raw = str(target).strip();
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", raw):
+            label = raw.upper();
+            if label not in self.data_line_index: raise BasicError("RESTORE {} has no DATA at or after that label".format(raw));
+            self.data_index = self.data_line_index[label];
+            return;
         number = int(self.expr.eval(target));
-        candidates = sorted(line for line in self.data_line_index if line >= number);
+        candidates = sorted(line for line in self.data_line_index if isinstance(line, int) and line >= number);
         if not candidates: raise BasicError("RESTORE {} has no DATA at or after that line".format(number));
         self.data_index = self.data_line_index[candidates[0]];
 
@@ -532,9 +563,9 @@ class BasicInterpreter:
             return pc + 1;
         if upper == "ELSE": return block_if.get(pc, pc) + 1;
         if upper in ("END IF", "ENDIF"): return pc + 1;
-        match = re.match(r"^GOTO\s+(\d+)$", text, re.I);
+        match = re.match(r"^GOTO\s+([A-Za-z_][A-Za-z0-9_]*|\d+)$", text, re.I);
         if match: return self._jump_line(match.group(1), line_to_pc);
-        match = re.match(r"^GOSUB\s+(\d+)$", text, re.I);
+        match = re.match(r"^GOSUB\s+([A-Za-z_][A-Za-z0-9_]*|\d+)$", text, re.I);
         if match:
             self.gosub_stack.append(pc + 1); return self._jump_line(match.group(1), line_to_pc);
         if upper == "RETURN":

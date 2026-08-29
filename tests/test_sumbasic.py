@@ -444,7 +444,10 @@ def test_retro_clock_example_loads_and_uses_time_font_data():
     assert 'DIM SHARED Font$(9, 6), Colon$(6)' in text;
     assert 'T$ = TIME$' in text;
     assert 'TIMER' in text;
-    assert 'PAUSE 50' in text;
+    assert 'BEEP .1, 0: PAUSE 45' in text;
+    assert ':LOOP' in text;
+    assert 'A$ = INKEY$' in text;
+    assert 'GOTO LOOP' in text;
     assert 'DATA " ███ "' in text;
 
 
@@ -625,3 +628,80 @@ END
 ''';
     basic, out = runner(source);
     assert out == 'later\nlater\n';
+
+
+def test_named_colon_label_goto_and_colon_statement_separator():
+    sleeps = [];
+    tones = [];
+    source = '''A! = 0
+GOTO LOOP
+A! = 99
+:LOOP
+A! = A! + 1: BEEP .1, 0: PAUSE 45
+PRINT A!
+END
+''';
+    basic = BasicInterpreter(output_func=lambda text, end="\n": None, sleep_func=lambda seconds: sleeps.append(seconds), tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic.program.load_text(source);
+    result = basic.run();
+    assert result['a!'] == 1;
+    assert len(tones) == 1;
+    assert abs(tones[0][1] - .1) < 1e-12;
+    assert tones[0][2] is True;
+    assert sleeps == [.9];
+
+
+def test_named_label_restore_can_target_following_data():
+    source = '''RESTORE FontData
+READ A$
+PRINT A$
+END
+:FontData
+DATA "retro"
+''';
+    basic, out = runner(source);
+    assert out == 'retro\n';
+
+
+def test_clock_style_inkey_loop_exits_on_q():
+    keys = iter(["", "q"]);
+    source = '''Count! = 0
+:LOOP
+Count! = Count! + 1
+A$ = INKEY$: IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
+GOTO LOOP
+''';
+    basic = BasicInterpreter(output_func=lambda text, end="\n": None, inkey_func=lambda: next(keys, "q"));
+    basic.program.load_text(source);
+    result = basic.run();
+    assert result['count!'] == 2;
+
+
+def test_ide_routes_q_and_escape_to_running_program_inkey(tmp_path):
+    import time;
+    from sumtui.events import Key, KeyEvent;
+    from sumbasic.ide import SumBasicIDE;
+    path = tmp_path / 'inkey.bas';
+    path.write_text('PRINT "saved"\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    ide.editor.set_text(':LOOP\nA$ = INKEY$\nIF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END\nPAUSE 1\nGOTO LOOP\n', modified=True);
+    ide.app.running = True;
+    original_text = ide.editor.text;
+    ide.run_program();
+    deadline = time.monotonic() + 1.0;
+    while (ide._run_thread is None or not ide._run_thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(.01);
+    assert ide.app.dispatch(KeyEvent(key='q', text='q')) is True;
+    ide._run_thread.join(timeout=2.0);
+    assert not ide._run_thread.is_alive();
+    assert ide.editor.text == original_text;
+    ide._poll_run_state();
+    ide.editor.set_text(':LOOP\nA$ = INKEY$\nIF A$ = CHR$(27) THEN END\nPAUSE 1\nGOTO LOOP\n', modified=True);
+    ide.run_program();
+    deadline = time.monotonic() + 1.0;
+    while (ide._run_thread is None or not ide._run_thread.is_alive()) and time.monotonic() < deadline:
+        time.sleep(.01);
+    assert ide.app.dispatch(KeyEvent(key=Key.ESCAPE, text='')) is True;
+    ide._run_thread.join(timeout=2.0);
+    assert not ide._run_thread.is_alive();
+    ide.app.running = False;
