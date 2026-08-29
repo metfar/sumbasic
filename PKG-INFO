@@ -1,3 +1,21 @@
+Metadata-Version: 2.4
+Name: sumbasic
+Version: 0.1.0a2
+Summary: Educational BASIC interpreter and Sum ecosystem frontend.
+Author-email: William Martinez Bas <metfar@gmail.com>
+License: GPL-2.0-or-later
+Classifier: Development Status :: 3 - Alpha
+Classifier: License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Education
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: sumtui>=0.5.16
+Requires-Dist: sumx>=0.1.6
+Requires-Dist: rich>=13.0
+Dynamic: license-file
+
 # sumBASIC 0.1.0a2
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. This alpha focuses on text-mode programs and now includes classic BASIC file channels, fixed-record random access, standard streams/pipelines, and an initial bridge to the xBase-compatible database engine used by sumX.

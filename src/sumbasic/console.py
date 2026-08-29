@@ -42,10 +42,10 @@ class SumBasicConsoleApp:
     def _submit(self, line, window):
         try:
             self.interpreter.execute_immediate(line);
-            self.status.set_text("Ready. {} line(s)".format(len(self.interpreter.program.source_lines())));
+            self.status.set("Ready. {} line(s)".format(len(self.interpreter.program.source_lines())));
         except Exception as exc:
             self.command.write_error("Error: {}".format(exc));
-            self.status.set_text("Error");
+            self.status.set("Error");
         self.app.invalidate();
         return None;
 

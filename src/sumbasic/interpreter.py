@@ -22,6 +22,8 @@
 import re;
 from pathlib import Path;
 
+from .channels import ChannelError, ChannelManager, channel_number;
+from .database import BasicDatabase;
 from .expressions import ExpressionEvaluator;
 from .program import BasicProgram;
 
@@ -38,7 +40,16 @@ class BasicInterpreter:
     def __init__(self, input_func=input, output_func=print):
         self.program = BasicProgram();
         self.variables = {};
-        self.expr = ExpressionEvaluator(self.variables);
+        self.channels = ChannelManager();
+        self.database = None;
+        self.expr = ExpressionEvaluator(self.variables, extra_functions={
+            "EOF": lambda channel: self.channels.eof(channel),
+            "LOF": lambda channel: self.channels.lof(channel),
+            "LOC": lambda channel: self.channels.loc(channel),
+            "FREEFILE": lambda: self.channels.freefile(),
+            "DBRECNO": lambda: self._db().recno(),
+            "DBRECCOUNT": lambda: self._db().reccount(),
+        });
         self.input_func = input_func;
         self.output_func = output_func;
         self.gosub_stack = [];
@@ -48,12 +59,31 @@ class BasicInterpreter:
         self.arrays = {};
 
     def reset_runtime(self):
+        self.channels.close_all();
         self.variables.clear();
         self.gosub_stack = [];
         self.for_stack = [];
         self.data = [];
         self.data_index = 0;
         self.arrays = {};
+
+
+    def _db(self):
+        if self.database is None:
+            self.database = BasicDatabase(max_areas=10);
+        return self.database;
+
+    def _channel_value(self, token):
+        raw = str(token).strip();
+        if raw.startswith("#"): raw = raw[1:].strip();
+        if len(raw) == 1 and raw.isalpha(): return channel_number(raw);
+        try: return channel_number(int(self.expr.eval(raw)));
+        except Exception: return channel_number(raw);
+
+    def _parse_open_source(self, raw):
+        text = str(raw).strip();
+        if text.upper() in ("STDIN", "STDOUT", "STDERR"): return text.lower() + ":";
+        return str(self.expr.eval(text));
 
     def _emit(self, text="", end="\n"):
         try:
@@ -176,6 +206,70 @@ class BasicInterpreter:
         if upper == "STOP": raise _StopProgram();
         if upper.startswith("DATA "): return pc + 1;
         if upper == "CLS": self._emit("\033[2J\033[H", end=""); return pc + 1;
+        match = re.match(r'^OPEN\s+(.+?)\s+FOR\s+(INPUT|OUTPUT|APPEND|BINARY|RANDOM)\s+AS\s+#?([A-Ja-j]|\d+)(?:\s+LEN\s*=\s*(.+))?$', text, re.I);
+        if match:
+            source_name = self._parse_open_source(match.group(1)); mode = match.group(2).lower(); channel = self._channel_value(match.group(3));
+            length = int(self.expr.eval(match.group(4))) if match.group(4) else 0; self.channels.open(source_name, mode, channel, record_length=length); return pc + 1;
+        match = re.match(r'^OPEN\s+(.+?)\s+MODE\s+["\']([^"\']+)["\']\s+AS\s+#?([A-Ja-j]|\d+)$', text, re.I);
+        if match:
+            self.channels.open(self._parse_open_source(match.group(1)), match.group(2), self._channel_value(match.group(3))); return pc + 1;
+        match = re.match(r'^CLOSE(?:\s+#?([A-Ja-j]|\d+))?$', text, re.I);
+        if match:
+            self.channels.close(self._channel_value(match.group(1))) if match.group(1) else self.channels.close_all(); return pc + 1;
+        match = re.match(r'^FIELD\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
+        if match:
+            definitions = [];
+            for item in self._split_print(match.group(2).replace(";", ",")):
+                part = item[0];
+                if not part: continue;
+                field_match = re.match(r'^(.+?)\s+AS\s+([A-Za-z_][A-Za-z0-9_]*\$)$', part, re.I);
+                if not field_match: raise BasicError("Invalid FIELD definition: {}".format(part));
+                definitions.append((int(self.expr.eval(field_match.group(1))), field_match.group(2)));
+            self.channels.define_fields(self._channel_value(match.group(1)), definitions);
+            for _, name in definitions: self.expr.set(name, "");
+            return pc + 1;
+        match = re.match(r'^GET\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
+        if match:
+            channel = self.channels.get(self._channel_value(match.group(1))); data = self.channels.get_record(channel.number, int(self.expr.eval(match.group(2))));
+            for field in channel.fields: self.expr.set(field.name, data[field.offset:field.offset + field.width].decode("latin-1").rstrip());
+            return pc + 1;
+        match = re.match(r'^PUT\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
+        if match:
+            channel = self.channels.get(self._channel_value(match.group(1))); payload = bytearray(b" " * channel.record_length);
+            for field in channel.fields:
+                raw = str(self.expr.get(field.name)).encode("latin-1", errors="replace")[:field.width].ljust(field.width, b" "); payload[field.offset:field.offset + field.width] = raw;
+            self.channels.put_record(channel.number, int(self.expr.eval(match.group(2))), payload); return pc + 1;
+        match = re.match(r'^LINE\s+INPUT\s+#([A-Ja-j]|\d+)\s*,\s*([A-Za-z_][A-Za-z0-9_]*\$)$', text, re.I);
+        if match:
+            self.expr.set(match.group(2), self.channels.readline(self._channel_value(match.group(1)))); return pc + 1;
+        match = re.match(r'^INPUT\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
+        if match:
+            names = [item.strip() for item in match.group(2).split(",")]; values = self.channels.input_values(self._channel_value(match.group(1)));
+            if len(values) < len(names): raise BasicError("INPUT # returned fewer values than variables");
+            for name, raw in zip(names, values): self.expr.set(name, self._coerce_input(name, raw));
+            return pc + 1;
+        match = re.match(r'^WRITE\s+#([A-Ja-j]|\d+)\s*,?\s*(.*)$', text, re.I);
+        if match:
+            import csv; import io;
+            values = [self.expr.eval(item[0]) for item in self._split_print(match.group(2)) if item[0]]; buffer = io.StringIO(); writer = csv.writer(buffer, lineterminator="\n"); writer.writerow(values);
+            self.channels.print(self._channel_value(match.group(1)), buffer.getvalue().rstrip("\n"), end="\n"); return pc + 1;
+        match = re.match(r'^PRINT\s+#([A-Ja-j]|\d+)\s*,?\s*(.*)$', text, re.I);
+        if match:
+            body = match.group(2); items = self._split_print(body); trailing = body.rstrip().endswith((";", ",")); rendered = "";
+            for expr, sep in items:
+                if expr: rendered += str(self.expr.eval(expr));
+                if sep == ",": rendered += "\t";
+            self.channels.print(self._channel_value(match.group(1)), rendered, end="" if trailing else "\n"); return pc + 1;
+        match = re.match(r'^DB\.SELECT\s+(.+)$', text, re.I);
+        if match: self._db().select(self.expr.eval(match.group(1)) if not re.fullmatch(r'[A-Ja-j]', match.group(1).strip()) else match.group(1).strip()); return pc + 1;
+        match = re.match(r'^DB\.USE(?:\s+(.+?))?(?:\s+ALIAS\s+([A-Za-z_][A-Za-z0-9_]*))?$', text, re.I);
+        if match:
+            table = self.expr.eval(match.group(1)) if match.group(1) else None; self._db().use(table, alias=match.group(2)); return pc + 1;
+        match = re.match(r'^DB\.GO\s+(.+)$', text, re.I);
+        if match: self._db().go(self.expr.eval(match.group(1)) if match.group(1).strip().upper() not in ("TOP", "BOTTOM") else match.group(1).strip().upper()); return pc + 1;
+        match = re.match(r'^DB\.SKIP(?:\s+(.+))?$', text, re.I);
+        if match: self._db().skip(int(self.expr.eval(match.group(1)))) if match.group(1) else self._db().skip(1); return pc + 1;
+        if upper == "DB.CLOSE": self._db().close(); self.database = None; return pc + 1;
         match = re.match(r"^LOCATE\s+(.+?)\s*,\s*(.+)$", text, re.I);
         if match:
             row = int(self.expr.eval(match.group(1))); col = int(self.expr.eval(match.group(2)));

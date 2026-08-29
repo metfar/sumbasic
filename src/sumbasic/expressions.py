@@ -54,8 +54,9 @@ def _split_args(text):
 
 
 class ExpressionEvaluator:
-    def __init__(self, variables=None):
+    def __init__(self, variables=None, extra_functions=None):
         self.variables = variables if variables is not None else {};
+        self.extra_functions = extra_functions if extra_functions is not None else {};
         self.random = random.Random();
 
     @staticmethod
@@ -112,6 +113,8 @@ class ExpressionEvaluator:
             return char * n;
         if upper in table:
             return table[upper](*args);
+        if upper in self.extra_functions:
+            return self.extra_functions[upper](*args);
         raise BasicExpressionError("Unknown function: {}".format(name));
 
     def eval(self, source):
@@ -124,6 +127,7 @@ class ExpressionEvaluator:
             segment = re.sub(r"\bOR\b", " or ", segment, flags=re.I);
             segment = re.sub(r"\bNOT\b", " not ", segment, flags=re.I);
             segment = re.sub(r"\bMOD\b", " % ", segment, flags=re.I);
+            segment = re.sub(r"\bDB\.(RECNO|RECCOUNT)\s*\(", lambda m: "DB" + m.group(1).upper() + "(", segment, flags=re.I);
             segment = segment.replace("^", "**");
             segment = re.sub(r"&H([0-9A-Fa-f]+)", lambda m: str(int(m.group(1), 16)), segment);
             segment = re.sub(r"&O([0-7]+)", lambda m: str(int(m.group(1), 8)), segment);
