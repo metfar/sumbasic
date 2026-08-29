@@ -147,3 +147,95 @@ def test_input_pipeline_channel():
     b.program.load_text('OPEN "| printf \'Ada\\n\'" FOR INPUT AS #1\nLINE INPUT #1, N$\nCLOSE #1\nPRINT N$\n');
     b.run();
     assert ''.join(output) == 'Ada\n';
+
+
+def test_pi_is_spectrum_constant_and_immutable():
+    from sumbasic.expressions import BasicExpressionError;
+    basic, out = runner('PRINT PI\n');
+    assert out == '3.1415927\n';
+    try:
+        basic.execute_immediate('PI = 3');
+        assert False, 'PI assignment should fail';
+    except BasicExpressionError:
+        pass;
+
+
+def test_hash_apostrophe_and_rem_comments():
+    basic, out = runner('A!=2 # modern comment\nPRINT A! \' classic comment\nREM old comment\nPRINT "# stays in strings"\n');
+    assert out == '2\n# stays in strings\n';
+
+
+def test_modern_suffix_mapping_integer_and_double():
+    basic, out = runner('A!=3.9\nB%=3\nPRINT A!; ","; B% / 2\n');
+    assert basic.variables['a!'] == 3;
+    assert isinstance(basic.variables['a!'], int);
+    assert isinstance(basic.variables['b%'], float);
+    assert out == '3,1.5\n';
+
+
+def test_data_is_literal_and_restore_to_line():
+    source = '''10 A!=99
+20 DATA A!, "first", 10
+30 DATA "second", 20
+40 READ X$, Y$, N!
+50 RESTORE 30
+60 READ Z$, M!
+70 PRINT X$; ":"; Y$; ":"; N!; ":"; Z$; ":"; M!
+''';
+    basic, out = runner(source);
+    assert out == 'A!:first:10:second:20\n';
+
+
+def test_multidimensional_classic_array_and_bounds():
+    source = '''DIM A$(5, 7, 3, 8)
+A$(2, 4, 1, 6) = "X"
+PRINT A$(2, 4, 1, 6)
+PRINT LBOUND(A$, 1); ":"; UBOUND(A$, 1); ":"; UBOUND(A$, 4)
+''';
+    basic, out = runner(source);
+    assert out == 'X\n0:5:8\n';
+    assert basic.arrays['a$'].dimensions == 4;
+
+
+def test_explicit_bounds_and_option_base():
+    source = '''OPTION BASE 1
+DIM A!(5, 2 TO 4)
+A!(1, 2)=7
+PRINT LBOUND(A!,1); ":"; UBOUND(A!,1); ":"; LBOUND(A!,2); ":"; UBOUND(A!,2); ":"; A!(1,2)
+''';
+    basic, out = runner(source);
+    assert out == '1:5:2:4:7\n';
+
+
+def test_dim_shared_and_modern_collections():
+    source = '''DIM SHARED Font AS DICT
+DIM Rows AS LIST
+Rows = [4, 10, 17]
+Font["A"] = Rows
+PRINT LEN(Font["A"])
+FOR EACH N! IN Font["A"]
+PRINT N!;
+NEXT N!
+''';
+    basic, out = runner(source);
+    assert out == '3\n41017';
+    assert 'font' in basic.shared_variables;
+    assert basic.variables['font']['A'] == [4, 10, 17];
+
+
+def test_collection_methods():
+    basic, out = runner('DIM Names AS LIST\nNames.APPEND("Ada")\nNames.APPEND("Linus")\nPRINT Names[1]\n');
+    assert out == 'Linus\n';
+
+
+def test_graphics_are_reserved_stubs():
+    basic, out = runner('SCREEN 1\nCIRCLE 100, 100, 20\nRECTANGLE 1, 1, 10, 10\n');
+    assert out == 'SCREEN: NOT IMPLEMENTED YET\nCIRCLE: NOT IMPLEMENTED YET\nRECTANGLE: NOT IMPLEMENTED YET\n';
+
+
+def test_bare_inkey_function():
+    output = [];
+    basic = BasicInterpreter(output_func=lambda text, end="\n": output.append(str(text) + end), inkey_func=lambda: "K");
+    basic.program.load_text('PRINT INKEY$\n');
+    basic.run();
+    assert ''.join(output) == 'K\n';

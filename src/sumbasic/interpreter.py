@@ -22,10 +22,12 @@
 import re;
 from pathlib import Path;
 
-from .channels import ChannelError, ChannelManager, channel_number;
+from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
 from .expressions import ExpressionEvaluator;
 from .program import BasicProgram;
+from .types import BasicArray, base_type, coerce_value, default_value, normalize_type, suffix_type;
+from .vocabulary import GRAPHICS_FUNCTION_STUBS, GRAPHICS_STUBS;
 
 
 class BasicError(RuntimeError):
@@ -37,41 +39,59 @@ class _StopProgram(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None):
         self.program = BasicProgram();
         self.variables = {};
+        self.variable_types = {};
+        self.arrays = {};
+        self.shared_variables = set();
         self.channels = ChannelManager();
         self.database = None;
-        self.expr = ExpressionEvaluator(self.variables, extra_functions={
+        self.input_func = input_func;
+        self.output_func = output_func;
+        self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
+        self.expr = ExpressionEvaluator(self.variables, self.variable_types, self.arrays, extra_functions={
             "EOF": lambda channel: self.channels.eof(channel),
             "LOF": lambda channel: self.channels.lof(channel),
             "LOC": lambda channel: self.channels.loc(channel),
             "FREEFILE": lambda: self.channels.freefile(),
             "DBRECNO": lambda: self._db().recno(),
             "DBRECCOUNT": lambda: self._db().reccount(),
+            "INKEY$": lambda: self.inkey_func(),
+            "POINT": lambda *args: self._stub_function("POINT", 0),
+            "SCREEN$": lambda *args: self._stub_function("SCREEN$", ""),
+            "ATTR": lambda *args: self._stub_function("ATTR", 0),
+            "PEEK": lambda *args: 0,
+            "IN": lambda *args: 0,
+            "USR": lambda *args: 0,
         });
-        self.input_func = input_func;
-        self.output_func = output_func;
         self.gosub_stack = [];
         self.for_stack = [];
         self.data = [];
         self.data_index = 0;
-        self.arrays = {};
+        self.data_line_index = {};
+        self.option_base = 0;
 
     def reset_runtime(self):
         self.channels.close_all();
         self.variables.clear();
+        self.variable_types.clear();
+        self.arrays.clear();
+        self.shared_variables.clear();
         self.gosub_stack = [];
         self.for_stack = [];
         self.data = [];
         self.data_index = 0;
-        self.arrays = {};
-
+        self.data_line_index = {};
+        self.option_base = 0;
 
     def _db(self):
-        if self.database is None:
-            self.database = BasicDatabase(max_areas=10);
+        if self.database is None: self.database = BasicDatabase(max_areas=10);
         return self.database;
+
+    def _stub_function(self, name, default):
+        self._emit("{}: NOT IMPLEMENTED YET".format(name));
+        return default;
 
     def _channel_value(self, token):
         raw = str(token).strip();
@@ -85,56 +105,90 @@ class BasicInterpreter:
         if text.upper() in ("STDIN", "STDOUT", "STDERR"): return text.lower() + ":";
         return str(self.expr.eval(text));
 
+    def _format_value(self, value):
+        if isinstance(value, float) and value.is_integer(): return str(int(value));
+        return str(value);
+
     def _emit(self, text="", end="\n"):
         try:
             self.output_func(str(text), end=end);
         except TypeError:
             self.output_func(str(text) + ("" if end == "" else end.rstrip("\n")));
 
-    def _split_colon(self, source):
-        out = [];
+    def _hash_is_channel(self, source, position):
+        rest = str(source)[position + 1:];
+        if not re.match(r"\s*(?:[A-Ja-j]|\d+)", rest): return False;
+        before = str(source)[:position].rstrip();
+        return bool(re.search(r"(?:\bAS|\bOPEN|\bCLOSE|\bFIELD|\bGET|\bPUT|\bPRINT|\bWRITE|\bINPUT|\bLINE\s+INPUT)\s*$", before, re.I));
+
+    def _strip_comment(self, source):
+        text = str(source);
+        output = [];
+        quote = False;
+        index = 0;
+        while index < len(text):
+            char = text[index];
+            if char == '"':
+                quote = not quote;
+                output.append(char);
+                index += 1;
+                continue;
+            if not quote and char == "'": break;
+            if not quote and char == "#" and not self._hash_is_channel(text, index): break;
+            output.append(char);
+            index += 1;
+        return "".join(output).rstrip();
+
+    def _split_top_level(self, source, separators=",", keep_empty=False):
+        items = [];
         current = [];
-        quote = None;
+        quote = False;
         depth = 0;
         for char in str(source):
-            if quote:
+            if char == '"':
+                quote = not quote;
                 current.append(char);
-                if char == quote: quote = None;
                 continue;
-            if char == '"': quote = char; current.append(char);
-            elif char == "(": depth += 1; current.append(char);
-            elif char == ")": depth -= 1; current.append(char);
-            elif char == ":" and depth == 0:
-                out.append("".join(current).strip()); current = [];
-            else: current.append(char);
-        out.append("".join(current).strip());
-        return [item for item in out if item];
+            if not quote and char in "([{": depth += 1;
+            elif not quote and char in ")]}": depth -= 1;
+            if not quote and depth == 0 and char in separators:
+                value = "".join(current).strip();
+                if value or keep_empty: items.append(value);
+                current = [];
+            else:
+                current.append(char);
+        value = "".join(current).strip();
+        if value or keep_empty: items.append(value);
+        return items;
+
+    def _split_colon(self, source):
+        return self._split_top_level(source, separators=":", keep_empty=False);
 
     def _split_print(self, source):
         items = [];
         current = [];
-        quote = None;
+        quote = False;
         depth = 0;
-        sep = None;
         for char in str(source):
-            if quote:
+            if char == '"':
+                quote = not quote;
                 current.append(char);
-                if char == quote: quote = None;
                 continue;
-            if char == '"': quote = char; current.append(char);
-            elif char == "(": depth += 1; current.append(char);
-            elif char == ")": depth -= 1; current.append(char);
-            elif char in ";," and depth == 0:
-                items.append(("".join(current).strip(), char)); current = [];
-            else: current.append(char);
+            if not quote and char in "([{": depth += 1;
+            elif not quote and char in ")]}": depth -= 1;
+            if not quote and depth == 0 and char in ";,":
+                items.append(("".join(current).strip(), char));
+                current = [];
+            else:
+                current.append(char);
         items.append(("".join(current).strip(), None));
         return items;
 
     def _coerce_input(self, name, text):
-        if str(name).endswith("$"): return str(text);
+        if suffix_type(name) == "STRING": return str(text);
         value = str(text).strip();
         if value == "": return 0;
-        try: return float(value) if any(c in value for c in ".eE") else int(value);
+        try: return float(value) if any(char in value for char in ".eE") else int(value);
         except ValueError: return value;
 
     def _build_execution(self):
@@ -142,21 +196,36 @@ class BasicInterpreter:
         line_to_pc = {};
         for number, source in self.program.source_lines():
             line_to_pc[int(number)] = len(execution);
-            for statement in self._split_colon(source):
-                execution.append((int(number), statement));
+            clean = self._strip_comment(source);
+            for statement in self._split_colon(clean): execution.append((int(number), statement));
         return execution, line_to_pc;
+
+    def _parse_data_value(self, source):
+        text = str(source).strip();
+        if text == "": return "";
+        if len(text) >= 2 and text[0] == text[-1] == '"': return text[1:-1].replace('""', '"');
+        if re.fullmatch(r"[+-]?&H[0-9A-Fa-f]+", text):
+            sign = -1 if text.startswith("-") else 1;
+            raw = text.lstrip("+-")[2:];
+            return sign * int(raw, 16);
+        if re.fullmatch(r"[+-]?&O[0-7]+", text):
+            sign = -1 if text.startswith("-") else 1;
+            raw = text.lstrip("+-")[2:];
+            return sign * int(raw, 8);
+        if re.fullmatch(r"[+-]?\d+", text): return int(text);
+        if re.fullmatch(r"[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[Ee][+-]?\d+)?", text) or re.fullmatch(r"[+-]?\d+[Ee][+-]?\d+", text): return float(text);
+        return text;
 
     def _scan_data(self, execution):
         data = [];
-        for _, statement in execution:
-            match = re.match(r"^DATA\s+(.+)$", statement, re.I);
+        lines = {};
+        for number, statement in execution:
+            match = re.match(r"^DATA(?:\s+(.*))?$", statement, re.I);
             if not match: continue;
-            for item in self._split_print(match.group(1).replace(";", ",")):
-                source = item[0];
-                if source:
-                    try: data.append(self.expr.eval(source));
-                    except Exception: data.append(source.strip().strip('"'));
+            if int(number) not in lines: lines[int(number)] = len(data);
+            for item in self._split_top_level(match.group(1) or "", separators=",", keep_empty=True): data.append(self._parse_data_value(item));
         self.data = data;
+        self.data_line_index = lines;
         self.data_index = 0;
 
     def run(self):
@@ -181,15 +250,16 @@ class BasicInterpreter:
         for pc, (_, stmt) in enumerate(execution):
             upper = stmt.strip().upper();
             is_start = upper.startswith(start_word + " ") or upper == start_word;
-            if start_word == "IF":
-                is_start = is_start and upper.endswith("THEN");
+            if start_word == "IF": is_start = is_start and upper.endswith("THEN");
             if is_start:
                 stack.append((pc, None));
             elif else_word and upper == else_word and stack:
-                start, _ = stack[-1]; stack[-1] = (start, pc);
+                start, _ = stack[-1];
+                stack[-1] = (start, pc);
             elif upper.startswith(end_word) and stack:
                 start, middle = stack.pop();
-                mapping[start] = (middle, pc); mapping[pc] = start;
+                mapping[start] = (middle, pc);
+                mapping[pc] = start;
                 if middle is not None: mapping[middle] = pc;
         return mapping;
 
@@ -198,18 +268,105 @@ class BasicInterpreter:
         if number not in line_to_pc: raise BasicError("Undefined line {}".format(number));
         return line_to_pc[number];
 
+    def _parse_dimensions(self, source):
+        bounds = [];
+        for dimension in self._split_top_level(source, separators=",", keep_empty=False):
+            explicit = re.match(r"^(.+?)\s+TO\s+(.+)$", dimension, re.I);
+            if explicit:
+                low = int(self.expr.eval(explicit.group(1)));
+                high = int(self.expr.eval(explicit.group(2)));
+            else:
+                low = self.option_base;
+                high = int(self.expr.eval(dimension));
+            bounds.append((low, high));
+        return bounds;
+
+    def _declare_one(self, declaration, shared=False, redim=False, preserve=False):
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*[$%&!]?)(?:\s*\((.*)\))?(?:\s+AS\s+(.+))?$", declaration.strip(), re.I);
+        if not match: raise BasicError("Invalid DIM declaration: {}".format(declaration));
+        name = match.group(1);
+        dimensions = match.group(2);
+        explicit_type = normalize_type(match.group(3));
+        suffix = suffix_type(name);
+        if explicit_type and suffix and base_type(explicit_type) != suffix:
+            raise BasicError("Type conflict for {}: suffix specifies {}, AS specifies {}".format(name, suffix, explicit_type));
+        type_name = explicit_type or suffix or "ANY";
+        key = name.casefold();
+        if name.upper() == "PI": raise BasicError("PI is a built-in constant and cannot be declared");
+        if dimensions is not None:
+            bounds = self._parse_dimensions(dimensions);
+            if redim and key in self.arrays:
+                self.arrays[key].resize(bounds, preserve=preserve);
+            else:
+                self.arrays[key] = BasicArray(name, bounds, type_name=type_name, shared=shared);
+            if shared: self.shared_variables.add(key);
+            return;
+        if redim: raise BasicError("REDIM requires an array");
+        self.variable_types[key] = type_name;
+        self.expr.set(name, default_value(type_name));
+        if shared: self.shared_variables.add(key);
+
+    def _declare(self, body, shared=False, redim=False, preserve=False):
+        for declaration in self._split_top_level(body, separators=",", keep_empty=False): self._declare_one(declaration, shared=shared, redim=redim, preserve=preserve);
+
+    def _assign_target(self, target, value):
+        text = str(target).strip();
+        array_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*\((.*)\)$", text);
+        if array_match and array_match.group(1).casefold() in self.arrays:
+            indices = [self.expr.eval(item) for item in self._split_top_level(array_match.group(2), separators=",", keep_empty=False)];
+            self.arrays[array_match.group(1).casefold()].set(indices, value);
+            return value;
+        subscript = re.match(r"^([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*\[(.*)\]$", text);
+        if subscript:
+            container = self.expr.get(subscript.group(1));
+            key = self.expr.eval(subscript.group(2));
+            container[key] = value;
+            return value;
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*[$%&!]?", text): return self.expr.set(text, value);
+        raise BasicError("Invalid assignment target: {}".format(target));
+
+    def _target_value(self, target):
+        text = str(target).strip();
+        array_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*\((.*)\)$", text);
+        if array_match and array_match.group(1).casefold() in self.arrays:
+            indices = [self.expr.eval(item) for item in self._split_top_level(array_match.group(2), separators=",", keep_empty=False)];
+            return self.arrays[array_match.group(1).casefold()].get(indices);
+        subscript = re.match(r"^([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*\[(.*)\]$", text);
+        if subscript: return self.expr.get(subscript.group(1))[self.expr.eval(subscript.group(2))];
+        return self.expr.get(text);
+
+    def _restore(self, target=None):
+        if target is None or str(target).strip() == "":
+            self.data_index = 0;
+            return;
+        number = int(self.expr.eval(target));
+        candidates = sorted(line for line in self.data_line_index if line >= number);
+        if not candidates: raise BasicError("RESTORE {} has no DATA at or after that line".format(number));
+        self.data_index = self.data_line_index[candidates[0]];
+
     def _execute_statement(self, source, pc, line_number, execution, line_to_pc, block_if, while_blocks, do_blocks):
         text = source.strip();
         upper = text.upper();
-        if not text or upper.startswith("REM ") or upper == "REM" or text.startswith("'"): return pc + 1;
-        if upper in ("END", "SYSTEM"): raise _StopProgram();
-        if upper == "STOP": raise _StopProgram();
-        if upper.startswith("DATA "): return pc + 1;
+        if not text or upper.startswith("REM ") or upper == "REM": return pc + 1;
+        if upper in ("END", "SYSTEM", "STOP"): raise _StopProgram();
+        if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return pc + 1;
         if upper == "CLS": self._emit("\033[2J\033[H", end=""); return pc + 1;
+        match = re.match(r"^OPTION\s+BASE\s+([01])$", text, re.I);
+        if match: self.option_base = int(match.group(1)); return pc + 1;
+        match = re.match(r"^DIM\s+(SHARED\s+)?(.+)$", text, re.I);
+        if match:
+            self._declare(match.group(2), shared=bool(match.group(1))); return pc + 1;
+        match = re.match(r"^REDIM\s+(PRESERVE\s+)?(.+)$", text, re.I);
+        if match:
+            self._declare(match.group(2), redim=True, preserve=bool(match.group(1))); return pc + 1;
         match = re.match(r'^OPEN\s+(.+?)\s+FOR\s+(INPUT|OUTPUT|APPEND|BINARY|RANDOM)\s+AS\s+#?([A-Ja-j]|\d+)(?:\s+LEN\s*=\s*(.+))?$', text, re.I);
         if match:
-            source_name = self._parse_open_source(match.group(1)); mode = match.group(2).lower(); channel = self._channel_value(match.group(3));
-            length = int(self.expr.eval(match.group(4))) if match.group(4) else 0; self.channels.open(source_name, mode, channel, record_length=length); return pc + 1;
+            source_name = self._parse_open_source(match.group(1));
+            mode = match.group(2).lower();
+            channel = self._channel_value(match.group(3));
+            length = int(self.expr.eval(match.group(4))) if match.group(4) else 0;
+            self.channels.open(source_name, mode, channel, record_length=length);
+            return pc + 1;
         match = re.match(r'^OPEN\s+(.+?)\s+MODE\s+["\']([^"\']+)["\']\s+AS\s+#?([A-Ja-j]|\d+)$', text, re.I);
         if match:
             self.channels.open(self._parse_open_source(match.group(1)), match.group(2), self._channel_value(match.group(3))); return pc + 1;
@@ -230,41 +387,56 @@ class BasicInterpreter:
             return pc + 1;
         match = re.match(r'^GET\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
         if match:
-            channel = self.channels.get(self._channel_value(match.group(1))); data = self.channels.get_record(channel.number, int(self.expr.eval(match.group(2))));
+            channel = self.channels.get(self._channel_value(match.group(1)));
+            data = self.channels.get_record(channel.number, int(self.expr.eval(match.group(2))));
             for field in channel.fields: self.expr.set(field.name, data[field.offset:field.offset + field.width].decode("latin-1").rstrip());
             return pc + 1;
         match = re.match(r'^PUT\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
         if match:
-            channel = self.channels.get(self._channel_value(match.group(1))); payload = bytearray(b" " * channel.record_length);
+            channel = self.channels.get(self._channel_value(match.group(1)));
+            payload = bytearray(b" " * channel.record_length);
             for field in channel.fields:
-                raw = str(self.expr.get(field.name)).encode("latin-1", errors="replace")[:field.width].ljust(field.width, b" "); payload[field.offset:field.offset + field.width] = raw;
-            self.channels.put_record(channel.number, int(self.expr.eval(match.group(2))), payload); return pc + 1;
+                raw = str(self.expr.get(field.name)).encode("latin-1", errors="replace")[:field.width].ljust(field.width, b" ");
+                payload[field.offset:field.offset + field.width] = raw;
+            self.channels.put_record(channel.number, int(self.expr.eval(match.group(2))), payload);
+            return pc + 1;
         match = re.match(r'^LINE\s+INPUT\s+#([A-Ja-j]|\d+)\s*,\s*([A-Za-z_][A-Za-z0-9_]*\$)$', text, re.I);
         if match:
             self.expr.set(match.group(2), self.channels.readline(self._channel_value(match.group(1)))); return pc + 1;
         match = re.match(r'^INPUT\s+#([A-Ja-j]|\d+)\s*,\s*(.+)$', text, re.I);
         if match:
-            names = [item.strip() for item in match.group(2).split(",")]; values = self.channels.input_values(self._channel_value(match.group(1)));
+            names = [item.strip() for item in match.group(2).split(",")];
+            values = self.channels.input_values(self._channel_value(match.group(1)));
             if len(values) < len(names): raise BasicError("INPUT # returned fewer values than variables");
-            for name, raw in zip(names, values): self.expr.set(name, self._coerce_input(name, raw));
+            for name, raw in zip(names, values): self._assign_target(name, self._coerce_input(name, raw));
             return pc + 1;
         match = re.match(r'^WRITE\s+#([A-Ja-j]|\d+)\s*,?\s*(.*)$', text, re.I);
         if match:
-            import csv; import io;
-            values = [self.expr.eval(item[0]) for item in self._split_print(match.group(2)) if item[0]]; buffer = io.StringIO(); writer = csv.writer(buffer, lineterminator="\n"); writer.writerow(values);
-            self.channels.print(self._channel_value(match.group(1)), buffer.getvalue().rstrip("\n"), end="\n"); return pc + 1;
+            import csv;
+            import io;
+            values = [self.expr.eval(item[0]) for item in self._split_print(match.group(2)) if item[0]];
+            buffer = io.StringIO();
+            writer = csv.writer(buffer, lineterminator="\n");
+            writer.writerow(values);
+            self.channels.print(self._channel_value(match.group(1)), buffer.getvalue().rstrip("\n"), end="\n");
+            return pc + 1;
         match = re.match(r'^PRINT\s+#([A-Ja-j]|\d+)\s*,?\s*(.*)$', text, re.I);
         if match:
-            body = match.group(2); items = self._split_print(body); trailing = body.rstrip().endswith((";", ",")); rendered = "";
-            for expr, sep in items:
-                if expr: rendered += str(self.expr.eval(expr));
-                if sep == ",": rendered += "\t";
-            self.channels.print(self._channel_value(match.group(1)), rendered, end="" if trailing else "\n"); return pc + 1;
+            body = match.group(2);
+            items = self._split_print(body);
+            trailing = body.rstrip().endswith((";", ","));
+            rendered = "";
+            for expression, separator in items:
+                if expression: rendered += self._format_value(self.expr.eval(expression));
+                if separator == ",": rendered += "\t";
+            self.channels.print(self._channel_value(match.group(1)), rendered, end="" if trailing else "\n");
+            return pc + 1;
         match = re.match(r'^DB\.SELECT\s+(.+)$', text, re.I);
         if match: self._db().select(self.expr.eval(match.group(1)) if not re.fullmatch(r'[A-Ja-j]', match.group(1).strip()) else match.group(1).strip()); return pc + 1;
         match = re.match(r'^DB\.USE(?:\s+(.+?))?(?:\s+ALIAS\s+([A-Za-z_][A-Za-z0-9_]*))?$', text, re.I);
         if match:
-            table = self.expr.eval(match.group(1)) if match.group(1) else None; self._db().use(table, alias=match.group(2)); return pc + 1;
+            table = self.expr.eval(match.group(1)) if match.group(1) else None;
+            self._db().use(table, alias=match.group(2)); return pc + 1;
         match = re.match(r'^DB\.GO\s+(.+)$', text, re.I);
         if match: self._db().go(self.expr.eval(match.group(1)) if match.group(1).strip().upper() not in ("TOP", "BOTTOM") else match.group(1).strip().upper()); return pc + 1;
         match = re.match(r'^DB\.SKIP(?:\s+(.+))?$', text, re.I);
@@ -272,33 +444,30 @@ class BasicInterpreter:
         if upper == "DB.CLOSE": self._db().close(); self.database = None; return pc + 1;
         match = re.match(r"^LOCATE\s+(.+?)\s*,\s*(.+)$", text, re.I);
         if match:
-            row = int(self.expr.eval(match.group(1))); col = int(self.expr.eval(match.group(2)));
+            row = int(self.expr.eval(match.group(1)));
+            col = int(self.expr.eval(match.group(2)));
             self._emit("\033[{};{}H".format(row, col), end=""); return pc + 1;
         if upper.startswith("PRINT") or text.startswith("?"):
             body = text[1:].strip() if text.startswith("?") else text[5:].strip();
-            if body.upper().startswith("USING "):
-                return self._print_using(body[6:].strip(), pc);
+            if body.upper().startswith("USING "): return self._print_using(body[6:].strip(), pc);
             items = self._split_print(body);
             trailing = body.rstrip().endswith((";", ","));
             rendered = "";
-            for expr, sep in items:
-                if expr: rendered += str(self.expr.eval(expr));
-                if sep == ",": rendered += "\t";
-                elif sep == ";": rendered += "";
+            for expression, separator in items:
+                if expression: rendered += self._format_value(self.expr.eval(expression));
+                if separator == ",": rendered += "\t";
             self._emit(rendered, end="" if trailing else "\n");
             return pc + 1;
-        match = re.match(r"^(LINE\s+INPUT|INPUT)\s*(?:\"([^\"]*)\"\s*[;,])?\s*([A-Za-z_][A-Za-z0-9_]*[$%&!#]?)$", text, re.I);
+        match = re.match(r"^(LINE\s+INPUT|INPUT)\s*(?:\"([^\"]*)\"\s*[;,])?\s*([A-Za-z_][A-Za-z0-9_]*[$%&!]?)$", text, re.I);
         if match:
             prompt = match.group(2) or ("? " if match.group(1).upper() == "INPUT" else "");
             raw = self.input_func(prompt);
             value = str(raw) if match.group(1).upper().startswith("LINE") else self._coerce_input(match.group(3), raw);
-            self.expr.set(match.group(3), value); return pc + 1;
-        match = re.match(r"^(?:LET\s+)?([A-Za-z_][A-Za-z0-9_]*[$%&!#]?)\s*=\s*(.+)$", text, re.I);
-        if match:
-            self.expr.set(match.group(1), self.expr.eval(match.group(2))); return pc + 1;
+            self._assign_target(match.group(3), value); return pc + 1;
         match = re.match(r"^IF\s+(.+?)\s+THEN(?:\s+(.*))?$", text, re.I);
         if match:
-            condition = bool(self.expr.eval(match.group(1))); tail = (match.group(2) or "").strip();
+            condition = bool(self.expr.eval(match.group(1)));
+            tail = (match.group(2) or "").strip();
             if tail:
                 then_part, else_part = self._split_inline_else(tail);
                 chosen = then_part if condition else else_part;
@@ -319,16 +488,38 @@ class BasicInterpreter:
         if upper == "RETURN":
             if not self.gosub_stack: raise BasicError("RETURN without GOSUB");
             return self.gosub_stack.pop();
-        match = re.match(r"^FOR\s+([A-Za-z_][A-Za-z0-9_]*[$%&!#]?)\s*=\s*(.+?)\s+TO\s+(.+?)(?:\s+STEP\s+(.+))?$", text, re.I);
+        match = re.match(r"^FOR\s+EACH\s+(.+?)\s+IN\s+(.+)$", text, re.I);
         if match:
-            name = match.group(1); start = self.expr.eval(match.group(2)); end = self.expr.eval(match.group(3)); step = self.expr.eval(match.group(4)) if match.group(4) else 1;
-            self.expr.set(name, start); next_pc = self._find_next(execution, pc);
-            self.for_stack.append({"name": name, "end": end, "step": step, "for_pc": pc, "next_pc": next_pc});
+            names = [item.strip() for item in self._split_top_level(match.group(1), separators=",", keep_empty=False)];
+            collection = self.expr.eval(match.group(2));
+            values = list(collection.items()) if isinstance(collection, dict) and len(names) == 2 else list(collection);
+            next_pc = self._find_next(execution, pc);
+            if not values: return next_pc + 1;
+            frame = {"kind": "each", "names": names, "values": values, "index": 0, "for_pc": pc, "next_pc": next_pc};
+            self.for_stack.append(frame);
+            self._assign_each_frame(frame);
             return pc + 1;
-        match = re.match(r"^NEXT(?:\s+([A-Za-z_][A-Za-z0-9_]*[$%&!#]?))?$", text, re.I);
+        match = re.match(r"^FOR\s+([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*=\s*(.+?)\s+TO\s+(.+?)(?:\s+STEP\s+(.+))?$", text, re.I);
+        if match:
+            name = match.group(1);
+            start = self.expr.eval(match.group(2));
+            end = self.expr.eval(match.group(3));
+            step = self.expr.eval(match.group(4)) if match.group(4) else 1;
+            self.expr.set(name, start);
+            next_pc = self._find_next(execution, pc);
+            self.for_stack.append({"kind": "numeric", "name": name, "end": end, "step": step, "for_pc": pc, "next_pc": next_pc});
+            return pc + 1;
+        match = re.match(r"^NEXT(?:\s+([A-Za-z_][A-Za-z0-9_]*[$%&!]?))?$", text, re.I);
         if match:
             if not self.for_stack: raise BasicError("NEXT without FOR");
-            frame = self.for_stack[-1]; value = self.expr.get(frame["name"]) + frame["step"]; self.expr.set(frame["name"], value);
+            frame = self.for_stack[-1];
+            if frame.get("kind") == "each":
+                frame["index"] += 1;
+                if frame["index"] < len(frame["values"]):
+                    self._assign_each_frame(frame); return frame["for_pc"] + 1;
+                self.for_stack.pop(); return pc + 1;
+            value = self.expr.get(frame["name"]) + frame["step"];
+            self.expr.set(frame["name"], value);
             keep = value <= frame["end"] if frame["step"] >= 0 else value >= frame["end"];
             if keep: return frame["for_pc"] + 1;
             self.for_stack.pop(); return pc + 1;
@@ -341,7 +532,8 @@ class BasicInterpreter:
         match = re.match(r"^DO(?:\s+(WHILE|UNTIL)\s+(.+))?$", text, re.I);
         if match:
             if match.group(1):
-                condition = bool(self.expr.eval(match.group(2))); condition = (not condition) if match.group(1).upper() == "UNTIL" else condition;
+                condition = bool(self.expr.eval(match.group(2)));
+                condition = (not condition) if match.group(1).upper() == "UNTIL" else condition;
                 if not condition:
                     pair = do_blocks.get(pc);
                     return (pair[1] + 1) if isinstance(pair, tuple) else pc + 1;
@@ -350,24 +542,58 @@ class BasicInterpreter:
         if match:
             start = do_blocks.get(pc, pc);
             if match.group(1):
-                condition = bool(self.expr.eval(match.group(2))); condition = (not condition) if match.group(1).upper() == "UNTIL" else condition;
+                condition = bool(self.expr.eval(match.group(2)));
+                condition = (not condition) if match.group(1).upper() == "UNTIL" else condition;
                 return start if condition else pc + 1;
             return start;
         match = re.match(r"^READ\s+(.+)$", text, re.I);
         if match:
-            for name in [item.strip() for item in match.group(1).split(",")]:
+            for name in self._split_top_level(match.group(1), separators=",", keep_empty=False):
                 if self.data_index >= len(self.data): raise BasicError("Out of DATA");
-                self.expr.set(name, self.data[self.data_index]); self.data_index += 1;
+                self._assign_target(name, self.data[self.data_index]);
+                self.data_index += 1;
             return pc + 1;
-        if upper.startswith("RESTORE"):
-            self.data_index = 0; return pc + 1;
-        match = re.match(r"^SWAP\s+([^,]+),\s*(.+)$", text, re.I);
+        match = re.match(r"^RESTORE(?:\s+(.+))?$", text, re.I);
         if match:
-            a = match.group(1).strip(); b = match.group(2).strip(); va = self.expr.get(a); vb = self.expr.get(b); self.expr.set(a, vb); self.expr.set(b, va); return pc + 1;
-        match = re.match(r"^DIM\s+([A-Za-z_][A-Za-z0-9_]*[$%&!#]?)\s*\((.+)\)$", text, re.I);
+            self._restore(match.group(1)); return pc + 1;
+        match = re.match(r"^SWAP\s+(.+?),\s*(.+)$", text, re.I);
         if match:
-            size = int(self.expr.eval(match.group(2))); self.arrays[match.group(1).casefold()] = [0] * (size + 1); return pc + 1;
+            first = match.group(1).strip();
+            second = match.group(2).strip();
+            first_value = self._target_value(first);
+            second_value = self._target_value(second);
+            self._assign_target(first, second_value);
+            self._assign_target(second, first_value);
+            return pc + 1;
+        match = re.match(r"^RANDOMIZE(?:\s+(.+))?$", text, re.I);
+        if match:
+            seed = self.expr.eval(match.group(1)) if match.group(1) else None;
+            self.expr.random.seed(seed); return pc + 1;
+        assignment = re.match(r"^(?:LET\s+)?(.+?)\s*=\s*(.+)$", text, re.I);
+        if assignment:
+            target = assignment.group(1).strip();
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*[$%&!]?", target) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*[$%&!]?\s*[\[(].*[\])]", target):
+                self._assign_target(target, self.expr.eval(assignment.group(2))); return pc + 1;
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*[$%&!]?\s*\.", text):
+            self.expr.eval(text); return pc + 1;
+        command = self._graphics_stub_name(text);
+        if command is not None:
+            self._emit("{}: NOT IMPLEMENTED YET".format(command)); return pc + 1;
         raise BasicError("Unsupported statement at line {}: {}".format(line_number, text));
+
+    def _assign_each_frame(self, frame):
+        value = frame["values"][frame["index"]];
+        names = frame["names"];
+        if len(names) == 1:
+            self._assign_target(names[0], value); return;
+        if not isinstance(value, (tuple, list)) or len(value) < len(names): raise BasicError("FOR EACH value cannot be unpacked");
+        for name, item in zip(names, value): self._assign_target(name, item);
+
+    def _graphics_stub_name(self, text):
+        upper = str(text).strip().upper();
+        for command in sorted(GRAPHICS_STUBS, key=len, reverse=True):
+            if upper == command or upper.startswith(command + " "): return command;
+        return None;
 
     def _split_inline_else(self, tail):
         match = re.match(r"^(.*?)(?:\s+ELSE\s+)(.*)$", tail, re.I);
@@ -392,14 +618,18 @@ class BasicInterpreter:
         for value in values:
             token = re.search(r"[#]+(?:\.[#]+)?", rendered);
             if token:
-                mask = token.group(0); decimals = len(mask.split(".", 1)[1]) if "." in mask else 0; width = len(mask);
+                mask = token.group(0);
+                decimals = len(mask.split(".", 1)[1]) if "." in mask else 0;
+                width = len(mask);
                 replacement = ("{:>%d.%df}" % (width, decimals)).format(float(value)) if decimals else ("{:>%dd}" % width).format(int(value));
                 rendered = rendered[:token.start()] + replacement + rendered[token.end():];
-            else: rendered += str(value);
+            else:
+                rendered += self._format_value(value);
         self._emit(rendered); return pc + 1;
 
     def execute_immediate(self, source):
-        text = str(source).strip();
+        text = self._strip_comment(str(source).strip());
+        if not text: return None;
         numbered = re.match(r"^(\d+)\s*(.*)$", text);
         if numbered:
             self.program.set_numbered_line(int(numbered.group(1)), numbered.group(2)); return None;
@@ -415,8 +645,10 @@ class BasicInterpreter:
         if match: self.program.delete_range(match.group(1), match.group(2)); return None;
         match = re.match(r"^RENUM(?:\s+(\d+)(?:\s*,\s*(\d+))?)?$", text, re.I);
         if match: self.program.renumber(match.group(1) or 10, match.group(2) or 10); return None;
-        # Execute one immediate BASIC statement by using a temporary free-form program while preserving variables.
-        old_program = self.program; temp = BasicProgram(); temp.free_lines = [text]; self.program = temp;
+        old_program = self.program;
+        temp = BasicProgram();
+        temp.free_lines = [text];
+        self.program = temp;
         execution, line_to_pc = self._build_execution();
         try:
             self._execute_statement(text, 0, 1, execution, line_to_pc, {}, {}, {});
