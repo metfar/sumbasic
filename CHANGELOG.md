@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0a15
+
+- Rebuilt the PLAY release under a new version so package managers cannot reuse an earlier cached `0.1.0a14` wheel. The reported traceback showed an installed interpreter whose line layout predated the PLAY execution branch even though its package was labelled a14.
+- `--check` now validates runtime statement recognition and jump targets instead of merely building the execution list; unsupported commands can no longer receive a misleading `OK`. CLI BASIC errors are reported cleanly without an implementation traceback.
+- Added regression coverage that executes `PLAY "T180O5N3cdefgabC"` through `BasicInterpreter.run()` and verifies that `--check` accepts PLAY but rejects an unsupported statement.
+- No ASC indices changed from 0.1.0a14.
+- Regression suite: 76 tests.
+
 ## 0.1.0a14
 
 - Implemented music strings: `PLAY` is an alias of Spectrum-128-style `ZXPLAY`, while `GWPLAY` provides a separate GW-BASIC Music Macro Language parser.

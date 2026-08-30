@@ -326,6 +326,92 @@ class BasicInterpreter:
             self._resume_context = None;
         return dict(self.variables);
 
+    def _validate_statement_syntax(self, source, line_number):
+        """Validate statement recognition without executing program side effects.
+
+        This is intentionally a syntax/recognition pass, not a type checker.  It
+        catches commands that the runtime would reject (the gap that made an
+        older cached a14 report PLAY as OK under --check) while allowing
+        expressions whose values are only known at run time.
+        """
+        text = str(source).strip();
+        upper = text.upper();
+        if not text or upper.startswith("REM ") or upper == "REM": return True;
+        if upper in ("END", "SYSTEM", "STOP", "CLS", "RETURN", "WEND", "ELSE", "END IF", "ENDIF"):
+            return True;
+        if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return True;
+        patterns = (
+            r"^OPTION\s+BASE\s+[01]$",
+            r"^DIM\s+(?:SHARED\s+)?.+$",
+            r"^REDIM\s+(?:PRESERVE\s+)?.+$",
+            r'^OPEN\s+.+?\s+FOR\s+(?:INPUT|OUTPUT|APPEND|BINARY|RANDOM)\s+AS\s+#?(?:[A-Ja-j]|\d+)(?:\s+LEN\s*=\s*.+)?$',
+            r'^OPEN\s+.+?\s+MODE\s+["\'][^"\']+["\']\s+AS\s+#?(?:[A-Ja-j]|\d+)$',
+            r'^CLOSE(?:\s+#?(?:[A-Ja-j]|\d+))?$',
+            r'^FIELD\s+#(?:[A-Ja-j]|\d+)\s*,\s*.+$',
+            r'^GET\s+#(?:[A-Ja-j]|\d+)\s*,\s*.+$',
+            r'^PUT\s+#(?:[A-Ja-j]|\d+)\s*,\s*.+$',
+            r'^LINE\s+INPUT\s+#(?:[A-Ja-j]|\d+)\s*,\s*[A-Za-z_][A-Za-z0-9_]*\$$',
+            r'^INPUT\s+#(?:[A-Ja-j]|\d+)\s*,\s*.+$',
+            r'^WRITE\s+#(?:[A-Ja-j]|\d+)\s*,?.*$',
+            r'^PRINT\s+#(?:[A-Ja-j]|\d+)\s*,?.*$',
+            r'^DB\.SELECT\s+.+$', r'^DB\.USE(?:\s+.+?)?(?:\s+ALIAS\s+[A-Za-z_][A-Za-z0-9_]*)?$',
+            r'^DB\.GO\s+.+$', r'^DB\.SKIP(?:\s+.+)?$', r'^DB\.CLOSE$',
+            r'^LOCATE\s+.+?\s*,\s*.+$',
+            r'^(?:LINE\s+INPUT|INPUT)\s*(?:"[^"]*"\s*[;,])?\s*[A-Za-z_][A-Za-z0-9_]*[$%&!]?$',
+            r'^GOTO\s+(?:[A-Za-z_][A-Za-z0-9_]*|\d+)$', r'^GOSUB\s+(?:[A-Za-z_][A-Za-z0-9_]*|\d+)$',
+            r'^FOR\s+EACH\s+.+?\s+IN\s+.+$',
+            r'^FOR\s+[A-Za-z_][A-Za-z0-9_]*[$%&!]?\s*=\s*.+?\s+TO\s+.+?(?:\s+STEP\s+.+)?$',
+            r'^NEXT(?:\s+[A-Za-z_][A-Za-z0-9_]*[$%&!]?)?$', r'^WHILE\s+.+$',
+            r'^DO(?:\s+(?:WHILE|UNTIL)\s+.+)?$', r'^LOOP(?:\s+(?:WHILE|UNTIL)\s+.+)?$',
+            r'^READ\s+.+$', r'^RESTORE(?:\s+.+)?$', r'^SWAP\s+.+?,\s*.+$',
+            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$',
+            r'^(?:PLAY|ZXPLAY|GWPLAY)\s+.+$',
+        );
+        if upper.startswith("PRINT") or text.startswith("?"): return True;
+        if any(re.match(pattern, text, re.I) for pattern in patterns):
+            if re.match(r"^(?:PLAY|ZXPLAY|GWPLAY)\s+", text, re.I):
+                command, body = re.match(r"^(PLAY|ZXPLAY|GWPLAY)\s+(.+)$", text, re.I).groups();
+                body = body.strip();
+                if body.upper() not in ("OFF", "STOP"):
+                    mode_match = re.match(r"^(FOREGROUND|BACKGROUND)\b\s*(.*)$", body, re.I);
+                    if mode_match: body = mode_match.group(2).strip();
+                    args = self._split_top_level(body, separators=",", keep_empty=False);
+                    limit = 3 if command.upper() in ("PLAY", "ZXPLAY") else 1;
+                    if not 1 <= len(args) <= limit:
+                        raise BasicError("{} requires {} music string{} at line {}".format(command.upper(), "one to three" if limit == 3 else "one", "s" if limit == 3 else "", line_number));
+            return True;
+        if re.match(r"^IF\s+.+?\s+THEN(?:\s+.*)?$", text, re.I):
+            match = re.match(r"^IF\s+(.+?)\s+THEN(?:\s+(.*))?$", text, re.I);
+            tail = (match.group(2) or "").strip();
+            if tail:
+                then_part, else_part = self._split_inline_else(tail);
+                for part in (then_part, else_part):
+                    if part and not re.fullmatch(r"\d+", part): self._validate_statement_syntax(part, line_number);
+            return True;
+        assignment = re.match(r"^(?:LET\s+)?(.+?)\s*=\s*(.+)$", text, re.I);
+        if assignment:
+            target = assignment.group(1).strip();
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*[$%&!]?", target) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*[$%&!]?\s*[\[(].*[\])]", target): return True;
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*[$%&!]?\s*\.", text): return True;
+        if self._graphics_stub_name(text) is not None: return True;
+        raise BasicError("Unsupported statement at line {}: {}".format(line_number, text));
+
+    def check(self):
+        """Validate block structure and runtime statement recognition without executing."""
+        execution, line_to_pc = self._build_execution();
+        self._match_blocks(execution, "IF", "END IF", else_word="ELSE");
+        self._match_blocks(execution, "WHILE", "WEND");
+        self._match_blocks(execution, "DO", "LOOP");
+        for line_number, statement in execution:
+            self._validate_statement_syntax(statement, line_number);
+        # Jump targets are cheap to validate statically and make --check useful.
+        for line_number, statement in execution:
+            jump = re.match(r"^(?:GOTO|GOSUB)\s+([A-Za-z_][A-Za-z0-9_]*|\d+)$", statement.strip(), re.I);
+            if jump:
+                raw = jump.group(1); target = int(raw) if raw.isdigit() else raw.upper();
+                if target not in line_to_pc: raise BasicError("Undefined target {} at line {}".format(raw, line_number));
+        return True;
+
     def run(self):
         self.stop_requested.clear();
         self.stopped_by_request = False;

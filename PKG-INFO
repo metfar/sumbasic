@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a14
+Version: 0.1.0a15
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -15,11 +15,23 @@ Requires-Dist: sumx>=0.1.8
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a14
+# sumBASIC 0.1.0a15
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
 This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
+
+## Installation note for 0.1.0a15
+
+Version 0.1.0a15 deliberately uses a new package version after a reported `0.1.0a14` installation loaded an earlier cached interpreter that did not yet contain the PLAY runtime branch. Install the a15 archive with normal upgrade semantics; `--check` now validates command recognition rather than only loading source lines.
+
+Quick verification:
+
+```bash
+sumbasic --version
+sumbasic --check examples/music.bas
+sumbasic -c 'PLAY "T240O5N10c"'
+```
 
 ## Language identity
 
@@ -206,7 +218,7 @@ BEEP 1, 0
 SOUND 262, 18.2
 ```
 
-`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. SOUND still uses the same frequency synthesis as BEEP, but from 0.1.0a14 BEEP and SOUND have independent buses so one need not serialize the other.
+`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. SOUND still uses the same frequency synthesis as BEEP, but from 0.1.0a15 BEEP and SOUND have independent buses so one need not serialize the other.
 
 Music is available through both historical string languages without ambiguous dialect guessing:
 
@@ -400,7 +412,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a14.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a15.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
@@ -422,7 +434,7 @@ sumbasic --check program.bas
 
 ## Tests
 
-The alpha includes 65 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
+The alpha includes 76 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
 
 
 ### STOP and CONTINUE

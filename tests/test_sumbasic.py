@@ -1,5 +1,5 @@
 from pathlib import Path;
-from sumbasic import BasicInterpreter, BasicProgram;
+from sumbasic import BasicError, BasicInterpreter, BasicProgram;
 
 
 def runner(source):
@@ -943,3 +943,26 @@ def test_zxplay_finite_phrase_repetition_matches_manual_shape():
     assert len(notes) == 5;
     assert abs(notes[1].frequency - notes[3].frequency) < 1e-6;
     assert abs(notes[2].frequency - notes[4].frequency) < 1e-6;
+
+
+def test_a15_play_runtime_branch_executes_reported_string():
+    tones = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic.program.load_text('PLAY "T180O5N3cdefgabC"\nEND\n');
+    basic.run();
+    basic.audio.wait_for_background();
+    assert len(tones) == 8;
+    assert all(item[2] is True for item in tones);
+
+
+def test_check_validates_statement_recognition_instead_of_only_loading():
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda *args, **kwargs: None);
+    basic.program.load_text('PLAY "T180O5N3cdefgabC"\nEND\n');
+    assert basic.check() is True;
+    basic.program.load_text('THIS_COMMAND_DOES_NOT_EXIST 123\nEND\n');
+    try:
+        basic.check();
+    except BasicError as exc:
+        assert 'Unsupported statement' in str(exc);
+    else:
+        raise AssertionError('--check recognition pass accepted an unsupported statement');

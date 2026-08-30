@@ -11,7 +11,7 @@ from pathlib import Path;
 from . import __version__;
 from .console import SumBasicConsoleApp;
 from .ide import SumBasicIDE;
-from .interpreter import BasicInterpreter;
+from .interpreter import BasicError, BasicInterpreter;
 from .terminal_input import TerminalInput;
 
 
@@ -35,24 +35,39 @@ def _finish_audio(interpreter):
 
 
 def _run_loaded(interpreter, interactive_terminal=False):
-    if interactive_terminal:
-        with TerminalInput() as terminal:
-            interpreter.input_func = terminal.input;
-            interpreter.inkey_func = terminal.inkey;
-            interpreter.run();
-            _finish_audio(interpreter);
+    try:
+        if interactive_terminal:
+            with TerminalInput() as terminal:
+                interpreter.input_func = terminal.input;
+                interpreter.inkey_func = terminal.inkey;
+                interpreter.run();
+                _finish_audio(interpreter);
+            return 0;
+        interpreter.run();
+        _finish_audio(interpreter);
         return 0;
-    interpreter.run();
-    _finish_audio(interpreter);
-    return 0;
+    except BasicError as exc:
+        print("sumBASIC error: {}".format(exc), file=sys.stderr);
+        return 1;
 
+
+
+
+def _check_loaded(interpreter, label):
+    try:
+        interpreter.check();
+    except BasicError as exc:
+        print("{}: ERROR: {}".format(label, exc), file=sys.stderr);
+        return 1;
+    print("{}: OK".format(label));
+    return 0;
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="sumbasic", description="Educational console BASIC for the Sum ecosystem.");
     parser.add_argument("file", nargs="?", help="BASIC source file; opens in the sumBASIC IDE unless --run/--check is used");
     parser.add_argument("-c", "--command", dest="command", help="execute BASIC source supplied directly on the command line");
     parser.add_argument("--run", action="store_true", help="run a BASIC program");
-    parser.add_argument("--check", action="store_true", help="parse/load the program without running it");
+    parser.add_argument("--check", action="store_true", help="validate program structure and recognized statements without running it");
     parser.add_argument("--plain", action="store_true", help="use the plain terminal REPL instead of sumTUI");
     parser.add_argument("--version", action="store_true", help="show version");
     return parser;
@@ -69,21 +84,18 @@ def main(argv=None):
     interpreter = BasicInterpreter();
     if args.command is not None:
         interpreter.program.load_text(str(args.command) + ("" if str(args.command).endswith("\n") else "\n"));
-        if args.check:
-            interpreter._build_execution(); print("command: OK"); return 0;
+        if args.check: return _check_loaded(interpreter, "command");
         return _run_loaded(interpreter, interactive_terminal=bool(getattr(sys.stdin, "isatty", lambda: False)()));
     if args.file:
         interpreter.program.load_file(Path(args.file));
-        if args.check:
-            interpreter._build_execution(); print("{}: OK".format(args.file)); return 0;
+        if args.check: return _check_loaded(interpreter, str(args.file));
         if args.run:
             return _run_loaded(interpreter, interactive_terminal=bool(getattr(sys.stdin, "isatty", lambda: False)()));
     if not args.plain and not bool(getattr(sys.stdin, "isatty", lambda: False)()):
         source = sys.stdin.read();
         if source.strip():
             interpreter.program.load_text(source);
-            if args.check:
-                interpreter._build_execution(); print("stdin: OK"); return 0;
+            if args.check: return _check_loaded(interpreter, "stdin");
             return _run_loaded(interpreter, interactive_terminal=False);
     if args.plain: return _plain_repl(interpreter);
     return int(SumBasicConsoleApp(interpreter=interpreter).run() or 0);
