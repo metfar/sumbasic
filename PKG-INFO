@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a15
+Version: 0.1.0a16
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,20 +10,20 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumtui>=0.5.19
-Requires-Dist: sumx>=0.1.8
+Requires-Dist: sumtui>=0.5.20
+Requires-Dist: sumx>=0.1.9
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a15
+# sumBASIC 0.1.0a16
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
 This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
 
-## Installation note for 0.1.0a15
+## Installation note for 0.1.0a16
 
-Version 0.1.0a15 deliberately uses a new package version after a reported `0.1.0a14` installation loaded an earlier cached interpreter that did not yet contain the PLAY runtime branch. Install the a15 archive with normal upgrade semantics; `--check` now validates command recognition rather than only loading source lines.
+Version 0.1.0a16 adds the shared movable-window IDE workspace and a persistent direct BASIC Command window. It retains the a15 `--check` validation fix and PLAY runtime behavior.
 
 Quick verification:
 
@@ -179,12 +179,18 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## IDE execution
 
-Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. `F5` is a **Run/Stop toggle** for the current editor buffer, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into the run pane as it is produced. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source. `F6` changes focus between the Editor and Output windows.
+Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, use `Alt+Arrow` for keyboard movement, F11 to maximize/restore, Ctrl+F4 to close the active window, and the **Window** menu to activate or reopen any default window. `F6` cycles Code → Output → Command.
+
+`F5` is a **Run/Stop toggle** for the current editor buffer, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into Output. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source.
+
+The floating **Command** window executes BASIC directly in the same interpreter state. Assignments persist between commands, so `A! = 10` followed by `PRINT A!` prints `10`; sound/music commands can be tried interactively, and `CONTINUE`/`CONT` resumes a program suspended by BASIC `STOP`. Direct commands do not require changing or saving the source buffer.
 
 ```text
 F2        Save
 F5        Run / Stop current BASIC buffer
-F6        Next Window (Editor / Output)
+F6        Next Window (Code / Output / Command)
+F11       Maximize / Restore active window
+Ctrl+F4   Close active window
 F9        Menu
 F10       Exit
 ```
@@ -412,7 +418,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a15.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a16.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

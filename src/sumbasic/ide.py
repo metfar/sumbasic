@@ -23,7 +23,7 @@ import queue;
 import re;
 import threading;
 
-from sumtui import FunctionAction, Menu, MenuItem, Panel, TextView, VBox;
+from sumtui import CommandWindow, FunctionAction, Menu, MenuItem, Separator, TextView, VBox, Workspace, WorkspaceWindow;
 from sumtui.events import Key, KeyEvent;
 from sumtui.tools.edit import EditApp;
 
@@ -129,13 +129,31 @@ class SumBasicIDE(EditApp):
         self._run_error = None;
         self._run_lock = threading.Lock();
         self._inkey_queue = queue.Queue();
+        self._direct_thread = None;
+        self._direct_output_buffer = "";
+        self._direct_finished = False;
+        self._direct_error = None;
         self.basic_interpreter = interpreter;
         super().__init__(path=path, theme=theme, **kwargs);
         self.output_view = TextView("Ready. Press F5 to run the current editor buffer.");
-        self.output_panel = Panel(self.output_view, title="Run output", content_style="viewer");
-        body = VBox(self.panel, self.output_panel, self.status, self.bar, sizes=[None, 12, 1, 1]);
+        self.command_view = CommandWindow(prompt="> ", on_submit=self._submit_direct_command);
+        title = self.document.path.name if self.document.path is not None else "Untitled";
+        available_width = max(40, int(self.app.width));
+        available_height = max(12, int(self.app.height) - 3);
+        code_width = max(30, min(available_width - 2, int(available_width * 0.78)));
+        code_height = max(9, min(available_height - 1, int(available_height * 0.72)));
+        output_width = max(28, min(available_width - 4, int(available_width * 0.68)));
+        output_height = max(7, min(available_height - 2, 10));
+        command_width = max(28, min(available_width - 2, 44));
+        command_height = max(7, min(available_height - 2, 11));
+        self.code_window = WorkspaceWindow(self.panel.child, title="Code - {}".format(title), name="code", left=1, top=0, width=code_width, height=code_height, content_style="viewer");
+        self.output_window = WorkspaceWindow(self.output_view, title="Output", name="output", left=3, top=max(1, available_height - output_height), width=output_width, height=output_height, content_style="viewer");
+        self.command_window = WorkspaceWindow(self.command_view, title="Command", name="command", left=max(0, available_width - command_width - 1), top=max(1, available_height - command_height - 1), width=command_width, height=command_height, content_style="command");
+        self.workspace = Workspace(self.output_window, self.command_window, self.code_window);
+        body = VBox(self.workspace, self.status, self.bar, sizes=[None, 1, 1]);
         self.desktop.body = body;
         self.app.set_root(self.desktop);
+        self.workspace.activate(self.code_window);
         if self.basic_interpreter is None:
             self.basic_interpreter = BasicInterpreter(input_func=self._ide_input, output_func=self._basic_output, inkey_func=self._ide_inkey);
         else:
@@ -144,11 +162,14 @@ class SumBasicIDE(EditApp):
         self._application_dispatch = self.app.dispatch;
         self.app.dispatch = self._dispatch_event;
         self.app.add_idle(self._poll_run_state);
+        self.menu.menus = self._menus();
         self._update_status();
 
     def _register_keybindings(self):
         super()._register_keybindings();
         self.keys.register("basic.run", "Run / Stop BASIC", ["f5"], context="editor", callback=self.toggle_run);
+        self.keys.register("menu.run", "Run menu", ["alt+r"], context="editor", callback=lambda: self.open_menu(6));
+        self.keys.register("menu.help", "Help menu", ["alt+h"], context="editor", callback=lambda: self.open_menu(7));
         return self.keys;
 
     def _make_function_bar(self):
@@ -161,11 +182,29 @@ class SumBasicIDE(EditApp):
 
     def _menus(self):
         menus = super()._menus();
-        menus.append(Menu("Run", [
+        run_menu = Menu("Run", [
             MenuItem("Run / Stop current buffer", self.toggle_run, self._ks("basic.run")),
             MenuItem("Continue after BASIC STOP", self.continue_program),
-        ]));
+        ]);
+        help_index = next((index for index, menu in enumerate(menus) if menu.title == "Help"), len(menus));
+        menus.insert(help_index, run_menu);
         return menus;
+
+    def _menu_closed(self):
+        workspace = getattr(self, "workspace", None);
+        if workspace is not None and workspace.active_window is not None:
+            focus = workspace.active_window.primary_focus();
+            if focus is not None:
+                self.app.focus.set(focus);
+                self.app.invalidate();
+                return True;
+        return super()._menu_closed();
+
+    def _set_document(self, document):
+        result = super()._set_document(document);
+        if hasattr(self, "code_window"):
+            self.code_window.title = "Code - {}".format(document.path.name if document.path is not None else "Untitled");
+        return result;
 
     def _basic_output(self, text, end="\n"):
         piece = str(text) + ("" if end == "" else end);
@@ -207,7 +246,7 @@ class SumBasicIDE(EditApp):
             self._run_error = None;
         self._run_screen.clear();
         self.output_view.set_text("Running...");
-        self.status.set("Running. F5 stops; F6 switches editor/output window.");
+        self.status.set("Running. F5 stops; F6 switches windows.");
         return None;
 
     def _run_worker(self, source):
@@ -248,7 +287,67 @@ class SumBasicIDE(EditApp):
         return True;
 
     def window_targets(self):
-        return [self.editor, self.output_view];
+        return [self.editor, self.output_view, self.command_view];
+
+    def _direct_output(self, text, end="\n"):
+        piece = str(text) + ("" if end == "" else end);
+        with self._run_lock:
+            self._direct_output_buffer += piece;
+        return None;
+
+    def _direct_worker(self, source):
+        previous_output = self.basic_interpreter.output_func;
+        try:
+            self.basic_interpreter.output_func = self._direct_output;
+            self.basic_interpreter.execute_direct(source);
+        except Exception as exc:
+            with self._run_lock:
+                self._direct_error = exc;
+        finally:
+            self.basic_interpreter.output_func = previous_output;
+            with self._run_lock:
+                self._direct_finished = True;
+        return None;
+
+    def _submit_direct_command(self, line, window):
+        source = str(line or "").strip();
+        if not source:
+            return None;
+        if self._run_thread is not None and self._run_thread.is_alive():
+            window.write_error("A BASIC program is running; stop it before using direct mode.");
+            return None;
+        if self._direct_thread is not None and self._direct_thread.is_alive():
+            window.write_error("A direct command is already running.");
+            return None;
+        with self._run_lock:
+            self._direct_output_buffer = "";
+            self._direct_error = None;
+            self._direct_finished = False;
+        self.status.set("Direct BASIC command running...");
+        if not self.app.running:
+            self._direct_worker(source);
+            self._finish_direct_command();
+            return None;
+        self._direct_thread = threading.Thread(target=self._direct_worker, args=(source,), name="sumBASIC-direct", daemon=True);
+        self._direct_thread.start();
+        return None;
+
+    def _finish_direct_command(self):
+        with self._run_lock:
+            output = self._direct_output_buffer;
+            error = self._direct_error;
+            self._direct_finished = False;
+        if output:
+            for line in output.rstrip("\n").splitlines():
+                self.command_view.write(line, style="command");
+        if error is not None:
+            self.command_view.write_error("Error: {}".format(error));
+            self.status.set("Direct command error");
+        else:
+            self.status.set("Direct command complete");
+        self._direct_thread = None;
+        self.app.invalidate();
+        return True;
 
     def toggle_run(self):
         if self._run_thread is not None and self._run_thread.is_alive():
@@ -322,6 +421,11 @@ class SumBasicIDE(EditApp):
             if rendered:
                 self.output_view.set_text(rendered);
                 self._scroll_output_end();
+        with self._run_lock:
+            direct_finished = self._direct_finished;
+        if direct_finished:
+            self._finish_direct_command();
+            dirty = True;
         if finished:
             rendered = self._run_screen.text();
             if error is not None:

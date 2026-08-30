@@ -570,6 +570,8 @@ def test_ide_f5_toggles_nonblocking_run_stop_and_f6_switches_windows(tmp_path):
     ide.switch_window();
     assert ide.app.focus.current is ide.output_view;
     ide.switch_window();
+    assert ide.app.focus.current is ide.command_view;
+    ide.switch_window();
     assert ide.app.focus.current is ide.editor;
     ide.toggle_run();
     ide._run_thread.join(timeout=2.0);
@@ -966,3 +968,46 @@ def test_check_validates_statement_recognition_instead_of_only_loading():
         assert 'Unsupported statement' in str(exc);
     else:
         raise AssertionError('--check recognition pass accepted an unsupported statement');
+
+
+def test_execute_direct_preserves_variables_and_suspended_program_context():
+    output = [];
+    basic = BasicInterpreter(output_func=lambda text, end="\n": output.append(str(text) + end));
+    basic.program.load_text('A! = 1\nSTOP\nA! = A! + 10\nEND\n');
+    basic.run();
+    assert basic.can_continue is True;
+    basic.execute_direct('A! = A! + 2: PRINT A!');
+    assert ''.join(output).endswith('3\n');
+    assert basic.can_continue is True;
+    basic.continue_run();
+    assert basic.variables['a!'] == 13;
+
+
+def test_ide_workspace_has_code_output_command_and_window_menu(tmp_path):
+    from sumbasic.ide import SumBasicIDE;
+    path = tmp_path / 'hello.bas';
+    path.write_text('PRINT "hello"\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    assert [window.name for window in ide.workspace.windows] == ['output', 'command', 'code'];
+    assert ide.workspace.active_window is ide.code_window;
+    menu = ide._window_menu();
+    labels = [item.label for item in menu.items if hasattr(item, 'label')];
+    assert 'Next Window' in labels;
+    assert any(label.startswith('Code') for label in labels);
+    assert any(label.startswith('Output') for label in labels);
+    assert any(label.startswith('Command') for label in labels);
+    assert ide.close_workspace_window(ide.command_window);
+    assert ide.command_window.visible is False;
+    assert ide.activate_workspace_window(ide.command_window);
+    assert ide.command_window.visible is True;
+
+
+def test_ide_direct_command_window_runs_basic_without_saving(tmp_path):
+    from sumbasic.ide import SumBasicIDE;
+    path = tmp_path / 'hello.bas';
+    path.write_text('PRINT "file"\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    ide.app.running = False;
+    ide._submit_direct_command('A! = 7: PRINT A!', ide.command_view);
+    assert any(line == '7' for line, _role in ide.command_view.output);
+    assert ide.basic_interpreter.variables['a!'] == 7;

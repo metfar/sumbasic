@@ -429,6 +429,62 @@ class BasicInterpreter:
         );
         return self._execute_context(context, 0);
 
+    def execute_direct(self, source):
+        """Execute direct-mode BASIC without clearing variables or arrays.
+
+        The source program and a suspended STOP/CONTINUE context are preserved.
+        This is the execution primitive used by IDE command windows and future
+        REPL frontends.  ``CONT``/``CONTINUE`` explicitly resume a suspended
+        program instead of being parsed as a new direct statement.
+        """;
+        text = str(source or "").strip();
+        if not text:
+            return dict(self.variables);
+        if text.upper() in ("CONT", "CONTINUE"):
+            return self.continue_run();
+        saved_program = self.program;
+        saved_resume = self._resume_context;
+        saved_stopped_statement = self.stopped_by_statement;
+        saved_stopped_request = self.stopped_by_request;
+        saved_data = list(self.data);
+        saved_data_index = self.data_index;
+        saved_data_line_index = dict(self.data_line_index);
+        saved_gosub = list(self.gosub_stack);
+        saved_for = list(self.for_stack);
+        saved_labels = dict(getattr(self, "execution_label_by_pc", {}));
+        saved_named_labels = dict(getattr(self, "execution_named_label_by_pc", {}));
+        saved_named_pc = dict(getattr(self, "named_label_pc", {}));
+        direct = BasicProgram();
+        direct.load_text(text);
+        try:
+            self.program = direct;
+            self.stop_requested.clear();
+            self.stopped_by_request = False;
+            self.stopped_by_statement = False;
+            execution, line_to_pc = self._build_execution();
+            self._scan_data(execution);
+            context = (
+                execution,
+                line_to_pc,
+                self._match_blocks(execution, "IF", "END IF", else_word="ELSE"),
+                self._match_blocks(execution, "WHILE", "WEND"),
+                self._match_blocks(execution, "DO", "LOOP"),
+            );
+            return self._execute_context(context, 0);
+        finally:
+            self.program = saved_program;
+            self._resume_context = saved_resume;
+            self.stopped_by_statement = saved_stopped_statement;
+            self.stopped_by_request = saved_stopped_request;
+            self.data = saved_data;
+            self.data_index = saved_data_index;
+            self.data_line_index = saved_data_line_index;
+            self.gosub_stack = saved_gosub;
+            self.for_stack = saved_for;
+            self.execution_label_by_pc = saved_labels;
+            self.execution_named_label_by_pc = saved_named_labels;
+            self.named_label_pc = saved_named_pc;
+
     def continue_run(self):
         if self._resume_context is None:
             raise BasicError("Cannot CONTINUE: no program is stopped");

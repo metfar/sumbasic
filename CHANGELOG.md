@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a16
+
+- Migrated the source IDE to the shared sumTUI 0.5.20 overlapping workspace with separate persistent **Code**, **Output**, and **Command** windows. Windows can be moved, activated, maximized/restored, closed, and reopened from the new Window menu.
+- F6 now cycles Code → Output → Command; F11 maximizes/restores the active window and Ctrl+F4 closes it. F5 remains the Run/Stop toggle, including F5 continuation after a language-level `STOP`.
+- Added a FoxPro-style direct BASIC Command window. Direct statements execute without replacing the loaded program and preserve variables/arrays; `CONTINUE`/`CONT` can resume the current STOP continuation point.
+- Program output remains isolated in Output while direct-command results stay in Command history.
+- Updated dependencies to `sumtui>=0.5.20` and `sumx>=0.1.9`. No ASC token indices changed from a15; the companion is republished with the a16 release name.
+- Regression suite: 79 tests.
+
 ## 0.1.0a15
 
 - Rebuilt the PLAY release under a new version so package managers cannot reuse an earlier cached `0.1.0a14` wheel. The reported traceback showed an installed interpreter whose line layout predated the PLAY execution branch even though its package was labelled a14.
