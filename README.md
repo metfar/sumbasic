@@ -1,4 +1,4 @@
-# sumBASIC 0.1.0a13
+# sumBASIC 0.1.0a14
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -166,16 +166,41 @@ For direct command-line execution, `--run` places an interactive POSIX terminal 
 
 Programs that require interactive `INPUT` should currently be run from the sumBASIC console; source-IDE modal input is a separate frontend milestone.
 
-## BEEP and SOUND
+## Command-line source and Unix pipelines
 
-sumBASIC deliberately keeps the ZX Spectrum and GW-BASIC tone models distinct:
+sumBASIC can be used as a normal Unix-language interpreter as well as through the IDE and interactive console:
+
+```bash
+echo 'PRINT "casa!"' | sumbasic
+sumbasic -c 'PRINT "la casa roja"'
+sumbasic --command 'BEEP 1, 1'
+```
+
+With no filename, a non-interactive standard input is treated as BASIC source and executed. `-c` and `--command` execute the supplied source directly without opening the IDE. Multi-statement BASIC source may use colons or an embedded newline in the command string.
+
+See `examples/command_line.sh`.
+
+## BEEP, SOUND and PLAY
+
+sumBASIC deliberately keeps the ZX Spectrum and GW-BASIC sound models distinct:
 
 ```basic
 BEEP 1, 0
 SOUND 262, 18.2
 ```
 
-`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. See `docs/AUDIO.md` and `examples/sound.bas`. Since 0.1.0a7 both commands use the same monophonic tone generator: SOUND converts Hertz to an equivalent fractional BEEP pitch and queues background notes sequentially, preventing overlapping POSIX audio processes from distorting sweeps and melodies.
+`BEEP duration, pitch` takes seconds followed by semitones relative to Middle C (`0` ≈ `261.625565 Hz`) and blocks until the tone ends. `SOUND frequency, duration` takes Hertz followed by approximately 18.2 PC timer ticks per second, accepts the historical `37..32767` Hz range, and plays in the background while BASIC execution continues. SOUND still uses the same frequency synthesis as BEEP, but from 0.1.0a14 BEEP and SOUND have independent buses so one need not serialize the other.
+
+Music is available through both historical string languages without ambiguous dialect guessing:
+
+```basic
+PLAY "T180O5N3cdefgabC"          # alias of ZXPLAY
+ZXPLAY A$, B$, C$                 # up to three Spectrum-style voices
+PLAY BACKGROUND "T180O5N3cdefg"
+GWPLAY "MB T180 O4 L8 CDEFG"     # Microsoft/GW-BASIC MML
+```
+
+`PLAY` is deliberately an alias of `ZXPLAY`; `GWPLAY` names the Microsoft dialect explicitly. Foreground/background music uses a separate music bus, so background PLAY can coexist with BEEP and SOUND. See `docs/AUDIO.md`, `docs/PLAY.md`, `examples/sound.bas`, and `examples/music.bas`.
 
 ## DATA, READ and RESTORE
 
@@ -358,7 +383,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a13.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a14.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
@@ -366,7 +391,7 @@ The parser does not depend on those numeric positions; they remain a cross-proje
 
 Structured `SUB`/`FUNCTION` execution and `CALL ... WITH ...` are reserved design work for the next procedure-scope milestone. The current `DIM SHARED` implementation establishes the global-state semantics those procedures will use.
 
-Also pending: full graphics rendering, virtual `PEEK`/`POKE` and port I/O, richer music/`PLAY` support, events/errors beyond current control flow, SumIR emission, and Python/native compilation.
+Also pending: full graphics rendering, virtual `PEEK`/`POKE` and port I/O, exact AY noise/envelope synthesis and indefinite Spectrum PLAY phrase repetition, events/errors beyond current control flow, SumIR emission, and Python/native compilation.
 
 ## Usage
 

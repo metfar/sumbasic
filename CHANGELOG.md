@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0a14
+
+- Implemented music strings: `PLAY` is an alias of Spectrum-128-style `ZXPLAY`, while `GWPLAY` provides a separate GW-BASIC Music Macro Language parser.
+- ZXPLAY supports one to three concurrent musical voices, notes across the Spectrum two-octave ranges, accidentals, `O`, duration codes `1..12`, rests, `N`, tempo, volume, tied-duration notation, finite phrase repetition, comments, and `H`; AY `M/W/X/U` controls are recognized/range-checked while exact noise/envelope synthesis remains pending.
+- GWPLAY supports notes/accidentals, octave, length, tempo, rests, numeric notes, dotted timing, articulation (`MN/ML/MS`) and historical foreground/background macros (`MF/MB`).
+- Added explicit `FOREGROUND`/`BACKGROUND` mode to both music dialects and `PLAY OFF`/`ZXPLAY OFF`/`GWPLAY OFF`.
+- Split BEEP, SOUND and MUSIC into independent logical audio buses; ZXPLAY voices A/B/C run concurrently inside one music session, while SOUND remains monophonic within its own queue.
+- Added Unix filter execution: piped stdin is BASIC source (`echo 'PRINT "casa!"' | sumbasic`).
+- Added `-c` / `--command` direct execution, including one-line sound/music commands.
+- Added `docs/PLAY.md`, expanded `docs/AUDIO.md`, `examples/music.bas`, and `examples/command_line.sh`.
+- Appended `ZXPLAY`, `GWPLAY`, `FOREGROUND`, and `BACKGROUND` to the shared ASC companion at codes `3131..3134` without shifting earlier entries.
+- Regression suite: 74 tests before packaging.
+
 ## 0.1.0a13
 
 - Documentation/example consistency pass: README now matches the implemented IDE convention (`F5` Run/Stop, `F6` Next Window), documents F5-after-`STOP` continuation correctly, points to the current ASC companion, and reports the current 65-test suite.

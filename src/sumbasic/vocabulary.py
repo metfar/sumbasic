@@ -46,7 +46,7 @@ ASC_BASIC_CODES = {
     652: "CREATE-SCR", 653: "SELECT-SCR", 654: "WRITE-SCR", 655: "REPRESENT-SCR",
 };
 
-# Appended to the supplied ASC table in asc_h-sumbasic-0.1.0a7.py so no
+# Appended to the supplied ASC table in asc_h-sumbasic-0.1.0a14.py so no
 # historical index is shifted.  The supplied table contained 2990 entries.
 ASC_MODERN_START = 2990;
 ASC_MODERN_WORDS = [
@@ -63,6 +63,7 @@ ASC_MODERN_WORDS = [
     "IDIV", "SIGN", "HEX$", "OCT$", "INSTR", "STRING$", "LCASE$", "UCASE$", "LTRIM$", "RTRIM$",
     "COMPLEX", "CMPLX", "REAL", "IMAG", "CONJ", "CONJUGATE", "PHASE", "ARG", "MAG", "NORM", "POLAR", "ISCOMPLEX",
     "TIME$", "TIMER", "LOGB", "LOGBASE",
+    "ZXPLAY", "GWPLAY", "FOREGROUND", "BACKGROUND",
 ];
 ASC_MODERN_CODES = {ASC_MODERN_START + index: word for index, word in enumerate(ASC_MODERN_WORDS)};
 

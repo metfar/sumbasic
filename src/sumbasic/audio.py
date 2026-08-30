@@ -23,6 +23,7 @@ import io;
 import math;
 import os;
 import queue;
+import re;
 import shutil;
 import struct;
 import subprocess;
@@ -36,6 +37,8 @@ MIDDLE_C_HZ = 261.6255653005986;
 GW_BASIC_TICKS_PER_SECOND = 18.2;
 GW_BASIC_SOUND_MIN_HZ = 37.0;
 GW_BASIC_SOUND_MAX_HZ = 32767.0;
+_NOTE_OFFSETS = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11};
+_ZX_DURATION_QUARTERS = {1: .25, 2: .375, 3: .5, 4: .75, 5: 1.0, 6: 1.5, 7: 2.0, 8: 3.0, 9: 4.0, 10: 1.0 / 6.0, 11: 1.0 / 3.0, 12: 2.0 / 3.0};
 
 
 def spectrum_pitch_frequency(pitch):
@@ -53,14 +56,17 @@ def gw_ticks_to_seconds(ticks):
     return float(ticks) / GW_BASIC_TICKS_PER_SECOND;
 
 
-class SystemTonePlayer:
-    """Portable monophonic tone backend shared by BEEP and SOUND.
+def _midi_frequency(midi_note):
+    return 440.0 * (2.0 ** ((float(midi_note) - 69.0) / 12.0));
 
-    Both BASIC statements use exactly one tone renderer.  Requests are queued
-    through one worker so a PC-speaker-style channel can never play two notes
-    simultaneously.  A blocking request (Spectrum BEEP) waits for its queued
-    note to finish; a background request (GW-BASIC SOUND) returns immediately
-    while the same worker renders it in order.
+
+class SystemTonePlayer:
+    """Small queued tone renderer.
+
+    Instances are intentionally cheap enough to be used as independent audio
+    buses.  sumBASIC therefore gives BEEP, SOUND, and each music voice their
+    own player instead of forcing all historical sound models through one
+    blocking queue.
     """
     def __init__(self, sample_rate=22050):
         self.sample_rate = max(8000, int(sample_rate));
@@ -75,30 +81,33 @@ class SystemTonePlayer:
                 self._worker.start();
         return self._worker;
 
-    def play(self, frequency, duration, blocking=True):
+    def play(self, frequency, duration, blocking=True, volume=1.0):
         frequency = float(frequency);
         duration = max(0.0, float(duration));
+        volume = max(0.0, min(1.0, float(volume)));
         if duration <= 0.0:
             return None;
         completed = threading.Event() if blocking else None;
         result = [];
         self._ensure_worker();
-        self._tone_queue.put((frequency, duration, completed, result));
+        self._tone_queue.put((frequency, duration, volume, completed, result));
         if completed is not None:
             completed.wait();
             return result[0] if result else False;
         return None;
 
     def wait_for_background(self):
-        """Wait until all queued SOUND requests have finished playing."""
         self._tone_queue.join();
         return None;
 
     def _worker_loop(self):
         while True:
-            frequency, duration, completed, result = self._tone_queue.get();
+            frequency, duration, volume, completed, result = self._tone_queue.get();
             try:
-                result.append(self._play_blocking(frequency, duration));
+                try:
+                    result.append(self._play_blocking(frequency, duration, volume));
+                except TypeError:
+                    result.append(self._play_blocking(frequency, duration));
             except Exception:
                 result.append(False);
             finally:
@@ -106,7 +115,7 @@ class SystemTonePlayer:
                     completed.set();
                 self._tone_queue.task_done();
 
-    def _play_blocking(self, frequency, duration):
+    def _play_blocking(self, frequency, duration, volume=1.0):
         if os.name == "nt":
             try:
                 import winsound;
@@ -117,14 +126,14 @@ class SystemTonePlayer:
         player = shutil.which("play");
         if player:
             try:
-                subprocess.run([player, "-q", "-n", "synth", "{:.6f}".format(duration), "sine", "{:.6f}".format(frequency)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
+                subprocess.run([player, "-q", "-v", "{:.4f}".format(volume), "-n", "synth", "{:.6f}".format(duration), "sine", "{:.6f}".format(frequency)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
                 return True;
             except OSError:
                 pass;
         aplay = shutil.which("aplay");
         if aplay:
             try:
-                payload = self._wav_bytes(frequency, duration);
+                payload = self._wav_bytes(frequency, duration, volume);
                 subprocess.run([aplay, "-q", "-"], input=payload, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
                 return True;
             except OSError:
@@ -137,9 +146,9 @@ class SystemTonePlayer:
         time.sleep(duration);
         return False;
 
-    def _wav_bytes(self, frequency, duration):
+    def _wav_bytes(self, frequency, duration, volume=1.0):
         count = max(1, int(round(self.sample_rate * float(duration))));
-        amplitude = 11000;
+        amplitude = int(11000 * max(0.0, min(1.0, float(volume))));
         frames = bytearray();
         for index in range(count):
             sample = int(amplitude * math.sin((2.0 * math.pi * float(frequency) * index) / self.sample_rate));
@@ -151,3 +160,391 @@ class SystemTonePlayer:
             wav.setframerate(self.sample_rate);
             wav.writeframes(bytes(frames));
         return stream.getvalue();
+
+
+class MusicParseError(ValueError):
+    pass;
+
+
+class MusicEvent:
+    def __init__(self, frequency, duration, volume=1.0):
+        self.frequency = None if frequency is None else float(frequency);
+        self.duration = max(0.0, float(duration));
+        self.volume = max(0.0, min(1.0, float(volume)));
+
+    def __repr__(self):
+        return "MusicEvent({!r}, {!r}, {!r})".format(self.frequency, self.duration, self.volume);
+
+
+def _remove_music_comments(source):
+    result = [];
+    comment = False;
+    for char in str(source):
+        if char == "!":
+            comment = not comment;
+            continue;
+        if not comment:
+            result.append(char);
+    return "".join(result);
+
+
+def _read_number(text, index, maximum_digits=None):
+    start = index;
+    while index < len(text) and text[index].isdigit() and (maximum_digits is None or index - start < maximum_digits):
+        index += 1;
+    if index == start:
+        return None, start;
+    return int(text[start:index]), index;
+
+
+def _expand_zx_repeats(text):
+    if str(text).endswith("))"):
+        raise MusicParseError("ZXPLAY indefinite phrase repetition with '))' is reserved but not implemented yet");
+    stack = [];
+    current = [];
+    for char in str(text):
+        if char == "(":
+            stack.append(current);
+            current = [];
+            continue;
+        if char == ")":
+            if stack:
+                segment = current;
+                current = stack.pop() + segment + segment;
+            else:
+                current = current + list(current);
+            continue;
+        current.append(char);
+    if stack:
+        raise MusicParseError("ZXPLAY phrase has an unmatched '('");
+    return "".join(current);
+
+
+class ZXPlayParser:
+    """Parser for the useful musical subset of the ZX Spectrum 128 PLAY language.
+
+    Notes, accidentals, octave, duration, rests, tempo, volume, N separators,
+    ties, and H are implemented.  AY noise/envelope selectors (M/W/X/U) are
+    recognized so historical strings remain parseable; the current sine-wave
+    backend does not yet emulate those AY-specific timbres.
+    """
+    def __init__(self, default_tempo=120):
+        self.default_tempo = int(default_tempo);
+
+    def parse(self, source, initial_tempo=None):
+        text = _remove_music_comments(source).replace(" ", "").replace("\t", "").replace("\r", "").replace("\n", "");
+        text = _expand_zx_repeats(text);
+        octave = 5;
+        tempo = int(initial_tempo or self.default_tempo);
+        duration_code = 5;
+        previous_duration_code = 5;
+        triplet_remaining = 0;
+        volume = 15;
+        tie_quarters = 0.0;
+        events = [];
+        index = 0;
+        while index < len(text):
+            char = text[index];
+            upper = char.upper();
+            if upper == "H":
+                break;
+            if upper == "N":
+                index += 1;
+                continue;
+            if upper in ("O", "T", "V", "W", "X", "U", "M"):
+                value, next_index = _read_number(text, index + 1);
+                if value is None:
+                    raise MusicParseError("ZXPLAY {} requires a number".format(upper));
+                if upper == "O":
+                    if value < 0 or value > 8: raise MusicParseError("ZXPLAY octave must be 0..8");
+                    octave = value;
+                elif upper == "T":
+                    if value < 60 or value > 240: raise MusicParseError("ZXPLAY tempo must be 60..240 BPM");
+                    tempo = value;
+                elif upper == "V":
+                    if value < 0 or value > 15: raise MusicParseError("ZXPLAY volume must be 0..15");
+                    volume = value;
+                elif upper == "W" and not 0 <= value <= 7:
+                    raise MusicParseError("ZXPLAY envelope W must be 0..7");
+                elif upper == "X" and not 0 <= value <= 65535:
+                    raise MusicParseError("ZXPLAY envelope period X must be 0..65535");
+                elif upper in ("U", "M") and not 0 <= value <= 63:
+                    raise MusicParseError("ZXPLAY {} mask must be 0..63".format(upper));
+                index = next_index;
+                continue;
+            if char.isdigit():
+                value, next_index = _read_number(text, index, maximum_digits=2);
+                if value not in _ZX_DURATION_QUARTERS:
+                    raise MusicParseError("ZXPLAY duration code must be 1..12");
+                previous_duration_code = duration_code;
+                duration_code = value;
+                if value >= 10:
+                    triplet_remaining = 3;
+                index = next_index;
+                if index < len(text) and text[index] == "_":
+                    tie_quarters += _ZX_DURATION_QUARTERS[duration_code];
+                    while index < len(text) and text[index] == "_": index += 1;
+                continue;
+            accidentals = 0;
+            while index < len(text) and text[index] in "#$":
+                accidentals += 1 if text[index] == "#" else -1;
+                index += 1;
+            if index >= len(text):
+                if accidentals: raise MusicParseError("ZXPLAY accidental without note");
+                break;
+            char = text[index];
+            upper = char.upper();
+            if upper in _NOTE_OFFSETS:
+                upper_octave = 1 if char.isupper() else 0;
+                midi_note = (12 * octave) + _NOTE_OFFSETS[upper] + (12 * upper_octave) + accidentals;
+                quarters = _ZX_DURATION_QUARTERS[duration_code] + tie_quarters;
+                tie_quarters = 0.0;
+                duration = quarters * (60.0 / float(tempo));
+                events.append(MusicEvent(_midi_frequency(midi_note), duration, float(volume) / 15.0));
+                index += 1;
+                if triplet_remaining:
+                    triplet_remaining -= 1;
+                    if triplet_remaining == 0:
+                        duration_code = previous_duration_code;
+                continue;
+            if char == "&":
+                quarters = _ZX_DURATION_QUARTERS[duration_code] + tie_quarters;
+                tie_quarters = 0.0;
+                events.append(MusicEvent(None, quarters * (60.0 / float(tempo)), 0.0));
+                index += 1;
+                if triplet_remaining:
+                    triplet_remaining -= 1;
+                    if triplet_remaining == 0:
+                        duration_code = previous_duration_code;
+                continue;
+            if char == "_":
+                index += 1;
+                continue;
+            raise MusicParseError("Unsupported ZXPLAY music code {!r}".format(char));
+        return events, tempo;
+
+
+class GWPlayParser:
+    """GW-BASIC PLAY Music Macro Language parser for notes and timing."""
+    def __init__(self):
+        self.default_tempo = 120;
+
+    def _duration(self, denominator, tempo, dots=0):
+        if denominator <= 0: raise MusicParseError("GWPLAY note length must be positive");
+        base = 240.0 / (float(tempo) * float(denominator));
+        factor = 1.0;
+        extra = .5;
+        for _ in range(dots):
+            factor += extra;
+            extra /= 2.0;
+        return base * factor;
+
+    def parse(self, source):
+        text = str(source).replace(" ", "").replace("\t", "").replace("\r", "").replace("\n", "");
+        octave = 4;
+        length = 4;
+        tempo = self.default_tempo;
+        articulation = .875;
+        requested_mode = "FOREGROUND";
+        events = [];
+        index = 0;
+        while index < len(text):
+            char = text[index];
+            upper = char.upper();
+            if upper in _NOTE_OFFSETS:
+                index += 1;
+                accidental = 0;
+                if index < len(text) and text[index] in "#+-":
+                    accidental = -1 if text[index] == "-" else 1;
+                    index += 1;
+                denominator, next_index = _read_number(text, index);
+                if denominator is None:
+                    denominator = length;
+                else:
+                    index = next_index;
+                dots = 0;
+                while index < len(text) and text[index] == ".":
+                    dots += 1;
+                    index += 1;
+                full_duration = self._duration(denominator, tempo, dots);
+                note_duration = full_duration * articulation;
+                midi_note = 12 * (octave + 1) + _NOTE_OFFSETS[upper] + accidental;
+                events.append(MusicEvent(_midi_frequency(midi_note), note_duration, 1.0));
+                if note_duration < full_duration:
+                    events.append(MusicEvent(None, full_duration - note_duration, 0.0));
+                continue;
+            if upper in ("O", "L", "T", "P", "N"):
+                value, next_index = _read_number(text, index + 1);
+                if value is None:
+                    raise MusicParseError("GWPLAY {} requires a number".format(upper));
+                index = next_index;
+                if upper == "O":
+                    if value < 0 or value > 6: raise MusicParseError("GWPLAY octave must be 0..6");
+                    octave = value;
+                elif upper == "L":
+                    if value < 1 or value > 64: raise MusicParseError("GWPLAY length must be 1..64");
+                    length = value;
+                elif upper == "T":
+                    if value < 32 or value > 255: raise MusicParseError("GWPLAY tempo must be 32..255 BPM");
+                    tempo = value;
+                elif upper == "P":
+                    dots = 0;
+                    while index < len(text) and text[index] == ".": dots += 1; index += 1;
+                    events.append(MusicEvent(None, self._duration(value, tempo, dots), 0.0));
+                elif upper == "N":
+                    if value == 0:
+                        events.append(MusicEvent(None, self._duration(length, tempo), 0.0));
+                    else:
+                        if value < 1 or value > 84: raise MusicParseError("GWPLAY N note must be 0..84");
+                        midi_note = value + 23;
+                        full_duration = self._duration(length, tempo);
+                        note_duration = full_duration * articulation;
+                        events.append(MusicEvent(_midi_frequency(midi_note), note_duration, 1.0));
+                        if note_duration < full_duration: events.append(MusicEvent(None, full_duration - note_duration, 0.0));
+                continue;
+            if upper == "M":
+                if index + 1 >= len(text): raise MusicParseError("GWPLAY M requires N/L/S/F/B");
+                code = text[index + 1].upper();
+                if code == "N": articulation = .875;
+                elif code == "L": articulation = 1.0;
+                elif code == "S": articulation = .75;
+                elif code == "F": requested_mode = "FOREGROUND";
+                elif code == "B": requested_mode = "BACKGROUND";
+                else: raise MusicParseError("GWPLAY M requires N/L/S/F/B");
+                index += 2;
+                continue;
+            if char == ">":
+                octave = min(6, octave + 1);
+                index += 1;
+                continue;
+            if char == "<":
+                octave = max(0, octave - 1);
+                index += 1;
+                continue;
+            raise MusicParseError("Unsupported GWPLAY music code {!r}".format(char));
+        return events, requested_mode;
+
+
+class MusicEngine:
+    """Queued music bus with concurrent voices inside each ZXPLAY session."""
+    def __init__(self, tone_func=None, sleep_func=None):
+        self.tone_func = tone_func;
+        self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
+        self.zx_parser = ZXPlayParser();
+        self.gw_parser = GWPlayParser();
+        self._queue = queue.Queue();
+        self._worker = None;
+        self._worker_lock = threading.Lock();
+        self._generation = 0;
+        self._generation_lock = threading.Lock();
+        self._channel_players = [SystemTonePlayer(), SystemTonePlayer(), SystemTonePlayer()];
+
+    def _ensure_worker(self):
+        with self._worker_lock:
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = threading.Thread(target=self._worker_loop, name="sumBASIC-music", daemon=True);
+                self._worker.start();
+
+    def _current_generation(self):
+        with self._generation_lock: return self._generation;
+
+    def stop(self):
+        with self._generation_lock: self._generation += 1;
+        return None;
+
+    def _enqueue(self, tracks, background):
+        completed = threading.Event();
+        generation = self._current_generation();
+        self._ensure_worker();
+        self._queue.put((generation, tracks, completed));
+        if not background:
+            completed.wait();
+        return completed;
+
+    def play_zx(self, strings, background=False):
+        if not 1 <= len(strings) <= 3: raise MusicParseError("ZXPLAY requires one to three music strings");
+        tempo = 120;
+        tracks = [];
+        for index, source in enumerate(strings):
+            events, parsed_tempo = self.zx_parser.parse(source, initial_tempo=tempo);
+            if index == 0: tempo = parsed_tempo;
+            tracks.append(events);
+        return self._enqueue(tracks, bool(background));
+
+    def play_gw(self, source, mode=None):
+        events, requested_mode = self.gw_parser.parse(source);
+        selected = str(mode or requested_mode).upper();
+        return self._enqueue([events], selected == "BACKGROUND");
+
+    def wait_for_background(self):
+        self._queue.join();
+        return None;
+
+    def _worker_loop(self):
+        while True:
+            generation, tracks, completed = self._queue.get();
+            try:
+                if generation == self._current_generation(): self._run_tracks(generation, tracks);
+            finally:
+                completed.set();
+                self._queue.task_done();
+
+    def _run_tracks(self, generation, tracks):
+        threads = [];
+        for index, events in enumerate(tracks):
+            thread = threading.Thread(target=self._run_track, args=(generation, index, events), name="sumBASIC-music-{}".format(index), daemon=True);
+            threads.append(thread);
+            thread.start();
+        for thread in threads: thread.join();
+
+    def _run_track(self, generation, channel, events):
+        player = self._channel_players[min(channel, len(self._channel_players) - 1)];
+        for event in events:
+            if generation != self._current_generation(): return;
+            if event.duration <= 0.0: continue;
+            if event.frequency is None:
+                deadline = time.monotonic() + event.duration;
+                while generation == self._current_generation() and time.monotonic() < deadline:
+                    self.sleep_func(min(.02, max(0.0, deadline - time.monotonic())));
+                continue;
+            if self.tone_func is not None:
+                self.tone_func(event.frequency, event.duration, True);
+            else:
+                player.play(event.frequency, event.duration, True, event.volume);
+
+
+class AudioEngine:
+    """Independent historical sound buses used by the BASIC interpreter."""
+    def __init__(self, tone_func=None, sleep_func=None):
+        self._custom_tone_func = tone_func;
+        self.beep_player = SystemTonePlayer();
+        self.sound_player = SystemTonePlayer();
+        self.music = MusicEngine(tone_func=tone_func, sleep_func=sleep_func);
+
+    def beep(self, frequency, duration):
+        if self._custom_tone_func is not None: return self._custom_tone_func(frequency, duration, True);
+        return self.beep_player.play(frequency, duration, True);
+
+    def sound(self, frequency, duration):
+        if self._custom_tone_func is not None: return self._custom_tone_func(frequency, duration, False);
+        return self.sound_player.play(frequency, duration, False);
+
+    def zxplay(self, strings, background=False):
+        return self.music.play_zx(strings, background=background);
+
+    def gwplay(self, source, mode=None):
+        return self.music.play_gw(source, mode=mode);
+
+    def stop_music(self):
+        return self.music.stop();
+
+    def stop_all(self):
+        # The process-based tone fallback cannot portably interrupt a note that
+        # is already inside a host audio API, but new music events are cancelled.
+        self.music.stop();
+        return None;
+
+    def wait_for_background(self):
+        if self._custom_tone_func is None: self.sound_player.wait_for_background();
+        self.music.wait_for_background();
+        return None;

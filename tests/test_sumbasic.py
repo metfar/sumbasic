@@ -813,3 +813,133 @@ def test_ide_f5_continues_after_basic_stop(tmp_path):
     ide.toggle_run();
     assert ide.basic_interpreter.can_continue is False;
     assert 'after' in ide.output_view.text;
+
+
+def test_zxplay_parser_uses_spectrum_128_note_case_octaves_and_tempo():
+    from sumbasic.audio import MIDDLE_C_HZ, ZXPlayParser;
+    events, tempo = ZXPlayParser().parse('T120O5cC');
+    assert tempo == 120;
+    assert len(events) == 2;
+    assert abs(events[0].frequency - MIDDLE_C_HZ) < 1e-6;
+    assert abs(events[1].frequency - (MIDDLE_C_HZ * 2.0)) < 1e-6;
+    assert abs(events[0].duration - .5) < 1e-12;
+    assert abs(events[1].duration - .5) < 1e-12;
+
+
+def test_zxplay_parser_duration_rest_accidental_and_volume():
+    from sumbasic.audio import MIDDLE_C_HZ, ZXPlayParser;
+    events, _ = ZXPlayParser().parse('T120O5V8N3#c&5d');
+    assert len(events) == 3;
+    assert abs(events[0].frequency - (MIDDLE_C_HZ * (2.0 ** (1.0 / 12.0)))) < 1e-6;
+    assert abs(events[0].duration - .25) < 1e-12;
+    assert abs(events[0].volume - (8.0 / 15.0)) < 1e-12;
+    assert events[1].frequency is None;
+    assert abs(events[1].duration - .25) < 1e-12;
+    assert abs(events[2].duration - .5) < 1e-12;
+
+
+def test_gwplay_parser_mml_and_background_marker():
+    from sumbasic.audio import MIDDLE_C_HZ, GWPlayParser;
+    events, mode = GWPlayParser().parse('MB T120 O4 L4 C');
+    assert mode == 'BACKGROUND';
+    assert len(events) == 2;
+    assert abs(events[0].frequency - MIDDLE_C_HZ) < 1e-6;
+    assert abs(sum(event.duration for event in events) - .5) < 1e-12;
+
+
+def test_play_is_zxplay_alias_and_gwplay_is_separate():
+    tones = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic.program.load_text('PLAY "T240O5c"\nZXPLAY "T240O5d"\nGWPLAY "MF T240 O4 L4 E"\nEND\n');
+    basic.run();
+    basic.audio.wait_for_background();
+    assert len(tones) == 3;
+    assert all(item[2] is True for item in tones);
+    assert tones[0][0] < tones[1][0] < tones[2][0];
+
+
+def test_zxplay_channels_run_concurrently_inside_one_music_session():
+    import threading;
+    import time;
+    from sumbasic.audio import AudioEngine;
+    started = [];
+    gate = threading.Event();
+    lock = threading.Lock();
+    def tone(frequency, duration, blocking):
+        with lock: started.append(frequency);
+        gate.wait(1.0);
+    audio = AudioEngine(tone_func=tone);
+    runner_thread = threading.Thread(target=lambda: audio.zxplay(['T240O5c', 'T240O5g'], background=False));
+    runner_thread.start();
+    deadline = time.monotonic() + 1.0;
+    while len(started) < 2 and time.monotonic() < deadline: time.sleep(.005);
+    assert len(started) == 2;
+    gate.set();
+    runner_thread.join(timeout=1.0);
+    assert not runner_thread.is_alive();
+
+
+def test_background_play_does_not_block_basic_and_audio_buses_are_independent():
+    import threading;
+    import time;
+    from sumbasic.audio import AudioEngine;
+    audio = AudioEngine();
+    assert audio.beep_player is not audio.sound_player;
+    assert audio.music._channel_players[0] is not audio.beep_player;
+    release = threading.Event();
+    started = threading.Event();
+    tones = [];
+    def tone(frequency, duration, blocking):
+        tones.append((frequency, duration, blocking));
+        started.set();
+        release.wait(1.0);
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=tone);
+    basic.program.load_text('PLAY BACKGROUND "T240O5c"\nA! = 7\nEND\n');
+    begin = time.monotonic();
+    result = basic.run();
+    assert time.monotonic() - begin < .25;
+    assert result['a!'] == 7;
+    assert started.wait(.5);
+    release.set();
+    basic.audio.wait_for_background();
+
+
+def test_gwplay_explicit_background_overrides_default_foreground():
+    import threading;
+    import time;
+    release = threading.Event();
+    started = threading.Event();
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, tone_func=lambda frequency, duration, blocking: (started.set(), release.wait(1.0)));
+    basic.program.load_text('GWPLAY BACKGROUND "MF T240 O4 L4 C"\nA! = 1\nEND\n');
+    begin = time.monotonic();
+    result = basic.run();
+    assert time.monotonic() - begin < .25;
+    assert result['a!'] == 1;
+    assert started.wait(.5);
+    release.set();
+    basic.audio.wait_for_background();
+
+
+def test_cli_command_and_stdin_pipeline_execution():
+    import os;
+    import subprocess;
+    import sys;
+    env = os.environ.copy();
+    command = subprocess.run([sys.executable, '-m', 'sumbasic', '-c', 'PRINT "la casa roja"'], text=True, capture_output=True, env=env, check=False);
+    assert command.returncode == 0;
+    assert command.stdout == 'la casa roja\n';
+    long_command = subprocess.run([sys.executable, '-m', 'sumbasic', '--command', 'PRINT "casa!"'], text=True, capture_output=True, env=env, check=False);
+    assert long_command.returncode == 0;
+    assert long_command.stdout == 'casa!\n';
+    piped = subprocess.run([sys.executable, '-m', 'sumbasic'], input='PRINT "casa!"\n', text=True, capture_output=True, env=env, check=False);
+    assert piped.returncode == 0;
+    assert piped.stdout == 'casa!\n';
+
+
+def test_zxplay_finite_phrase_repetition_matches_manual_shape():
+    from sumbasic.audio import ZXPlayParser;
+    events, _ = ZXPlayParser().parse('T240O5c(de)');
+    notes = [event for event in events if event.frequency is not None];
+    assert len(notes) == 5;
+    assert abs(notes[1].frequency - notes[3].frequency) < 1e-6;
+    assert abs(notes[2].frequency - notes[4].frequency) < 1e-6;

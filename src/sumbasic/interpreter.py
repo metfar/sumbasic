@@ -24,7 +24,7 @@ import threading;
 import time;
 from pathlib import Path;
 
-from .audio import GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, SystemTonePlayer, gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency;
+from .audio import AudioEngine, GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, MusicParseError, gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency;
 from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
 from .expressions import ExpressionEvaluator;
@@ -61,8 +61,9 @@ class BasicInterpreter:
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
-        self.tone_player = SystemTonePlayer();
-        self.tone_func = tone_func if tone_func is not None else self.tone_player.play;
+        self.audio = AudioEngine(tone_func=tone_func, sleep_func=self.sleep_func);
+        self.tone_player = self.audio.sound_player;
+        self.tone_func = tone_func if tone_func is not None else self.audio.sound;
         self.expr = ExpressionEvaluator(self.variables, self.variable_types, self.arrays, extra_functions={
             "EOF": lambda channel: self.channels.eof(channel),
             "LOF": lambda channel: self.channels.lof(channel),
@@ -293,6 +294,7 @@ class BasicInterpreter:
     def request_stop(self):
         """Request cooperative termination of the currently running BASIC program."""
         self.stop_requested.set();
+        self.audio.stop_all();
         return True;
 
     def _stop_if_requested(self):
@@ -714,7 +716,7 @@ class BasicInterpreter:
             pitch = float(self.expr.eval(args[1]));
             if duration < 0: raise BasicError("BEEP duration must be non-negative");
             frequency = spectrum_pitch_frequency(pitch);
-            self.tone_func(frequency, duration, True);
+            self.audio.beep(frequency, duration);
             return pc + 1;
         match = re.match(r"^SOUND\s+(.+)$", text, re.I);
         if match:
@@ -730,7 +732,30 @@ class BasicInterpreter:
             # it preserves SOUND syntax/units while keeping one monophonic backend.
             pitch = spectrum_frequency_pitch(frequency);
             tone_frequency = spectrum_pitch_frequency(pitch);
-            self.tone_func(tone_frequency, gw_ticks_to_seconds(ticks), False);
+            self.audio.sound(tone_frequency, gw_ticks_to_seconds(ticks));
+            return pc + 1;
+        match = re.match(r"^(PLAY|ZXPLAY|GWPLAY)\s+(.+)$", text, re.I);
+        if match:
+            command = match.group(1).upper();
+            body = match.group(2).strip();
+            if body.upper() in ("OFF", "STOP"):
+                self.audio.stop_music(); return pc + 1;
+            mode = None;
+            mode_match = re.match(r"^(FOREGROUND|BACKGROUND)\b\s*(.*)$", body, re.I);
+            if mode_match:
+                mode = mode_match.group(1).upper();
+                body = mode_match.group(2).strip();
+            args = self._split_top_level(body, separators=",", keep_empty=False);
+            try:
+                if command in ("PLAY", "ZXPLAY"):
+                    if not 1 <= len(args) <= 3: raise BasicError("{} requires one to three music strings".format(command));
+                    strings = [str(self.expr.eval(arg)) for arg in args];
+                    self.audio.zxplay(strings, background=(mode == "BACKGROUND"));
+                else:
+                    if len(args) != 1: raise BasicError("GWPLAY requires one music string");
+                    self.audio.gwplay(str(self.expr.eval(args[0])), mode=mode);
+            except MusicParseError as exc:
+                raise BasicError(str(exc)) from exc;
             return pc + 1;
         assignment = re.match(r"^(?:LET\s+)?(.+?)\s*=\s*(.+)$", text, re.I);
         if assignment:

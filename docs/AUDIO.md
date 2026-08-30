@@ -1,6 +1,6 @@
 # Sound in sumBASIC
 
-sumBASIC intentionally keeps two historically different tone commands instead of making them aliases.
+sumBASIC keeps historical command semantics visible while sharing low-level tone synthesis.
 
 ## ZX Spectrum `BEEP`
 
@@ -20,14 +20,6 @@ The frequency conversion is:
 frequency = 261.6255653005986 * 2^(pitch / 12)
 ```
 
-Examples:
-
-```basic
-BEEP 1, 0
-BEEP .5, 12
-BEEP .5, -12
-```
-
 ## GW-BASIC `SOUND`
 
 ```basic
@@ -36,20 +28,54 @@ SOUND frequency, duration
 
 - `frequency` is in Hertz, with the historical range `37..32767` Hz.
 - `duration` is in PC timer ticks at approximately `18.2` ticks per second.
-- execution is non-blocking/background: the BASIC program continues while the tone plays.
-
-Examples:
+- execution is non-blocking/background: BASIC continues while the SOUND queue plays.
 
 ```basic
 SOUND 262, 18.2
 SOUND 440, 9.1
 ```
 
-The first example is approximately the same note and duration as `BEEP 1, 0`, but uses the GW-BASIC physical-frequency model and does not block program execution.
+SOUND converts Hertz to the equivalent fractional Spectrum semitone and feeds the same sine/tone synthesis algorithm. It is not quantized to integer semitones.
 
-Both commands share one monophonic tone generator. `BEEP` supplies a Spectrum pitch directly. `SOUND` converts its Hertz value to the equivalent fractional semitone relative to Middle C and then uses that same generator. This conversion does not quantize to integer semitones, so frequencies such as 440 Hz remain 440 Hz within floating-point precision.
+## Music: PLAY, ZXPLAY and GWPLAY
 
-Background `SOUND` requests are queued on one audio channel and played sequentially. This matters on POSIX systems: launching one independent audio process/thread per SOUND statement causes overlapping tones and audible distortion in loops. `SOUND` still returns immediately to the BASIC program; only the audio channel is serialized.
-When `sumbasic --run` reaches the end of the program, the launcher waits for already queued notes to finish so a final SOUND is not cut off merely because the host Python process exits.
+```basic
+PLAY "T180O5N3cdefgabC"
+ZXPLAY "T180O5N3cdefgabC"
+GWPLAY "T180 O4 L8 C D E F G A B"
+```
 
-The default Python backend uses the native Windows beep API when available, then common POSIX audio tools when installed, with a terminal-bell fallback. Frontends/tests may inject their own tone backend without changing BASIC semantics.
+`PLAY` is an alias of `ZXPLAY`. The Spectrum 128 dialect supports up to three simultaneous strings. `GWPLAY` is a separate Microsoft/GW-BASIC MML parser rather than an auto-detected dialect. See `docs/PLAY.md` for the string languages and current compatibility surface.
+
+Both music dialects accept the sumBASIC execution-mode extension:
+
+```basic
+PLAY FOREGROUND A$
+PLAY BACKGROUND A$, B$, C$
+GWPLAY FOREGROUND G$
+GWPLAY BACKGROUND G$
+```
+
+GWPLAY additionally understands its historical `MF` and `MB` macro codes.
+
+## Independent buses
+
+The default engine is arranged as independent logical buses:
+
+```text
+AudioEngine
+├── BEEP                 blocking Spectrum tone bus
+├── SOUND                asynchronous monophonic queue
+└── MUSIC                queued PLAY sessions
+    ├── ZX voice A
+    ├── ZX voice B
+    └── ZX voice C
+```
+
+A background PLAY therefore continues while BASIC executes a BEEP or queues SOUND. BEEP is still blocking **to the BASIC program**, but it does not pause the music worker. SOUND notes remain serialized with other SOUND notes to avoid the distorted overlapping-process behavior fixed in 0.1.0a7.
+
+A short-lived command-line invocation waits for queued SOUND/music after normal program completion so the final phrase is not truncated. `STOP` suspends BASIC state without discarding background music. A frontend user-abort requests music cancellation.
+
+The default backend uses Windows `winsound` where available, then common POSIX audio tools, with generated WAV/terminal-bell fallback. Music volume is honored by backends that expose amplitude control.
+
+<p align=center><b>- oOo -<b></p>
