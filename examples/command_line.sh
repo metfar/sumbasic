@@ -5,3 +5,5 @@ echo 'PRINT "casa!"' | sumbasic
 sumbasic -c 'PRINT "la casa roja"'
 sumbasic --command 'BEEP 1, 1'
 sumbasic -c 'PLAY "T200O5N3cdefgabC"'
+sumbasic -c 'SHELL "pwd"'
+printf 'SHELL "uname -s"\n' | sumbasic

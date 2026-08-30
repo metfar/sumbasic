@@ -1,12 +1,12 @@
-# sumBASIC 0.1.0a16
+# sumBASIC 0.1.0a17
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
 This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
 
-## Installation note for 0.1.0a16
+## Installation note for 0.1.0a17
 
-Version 0.1.0a16 adds the shared movable-window IDE workspace and a persistent direct BASIC Command window. It retains the a15 `--check` validation fix and PLAY runtime behavior.
+Version 0.1.0a17 adds executable `SHELL` support on top of the movable-window IDE: quoted shell commands are captured into BASIC output, while bare `SHELL` can temporarily hand the real terminal to the user's interactive shell and restore the IDE afterward.
 
 Quick verification:
 
@@ -195,6 +195,30 @@ sumbasic --command 'BEEP 1, 1'
 ```
 
 With no filename, a non-interactive standard input is treated as BASIC source and executed. `-c` and `--command` execute the supplied source directly without opening the IDE. Multi-statement BASIC source may use colons or an embedded newline in the command string.
+
+## SHELL
+
+`SHELL` uses the host command interpreter without turning sumBASIC into a shell parser. A string expression runs one command and captures both standard output and standard error:
+
+```basic
+SHELL "ls -la"
+Cmd$ = "pwd"
+SHELL Cmd$
+```
+
+From the source IDE the captured text is routed to the **Output** window even when `SHELL` was entered from the floating **Command** window. In console/`--run` mode it is written to the current terminal output. The command is executed through the user's configured shell (`$SHELL` on POSIX/Termux, `%COMSPEC%` on Windows); POSIX fallback discovery also covers `sh` and Android's `/system/bin/sh`.
+
+Bare `SHELL` starts an interactive subshell:
+
+```basic
+PRINT "Entering the system shell"
+SHELL
+PRINT "Back in BASIC"
+```
+
+In the IDE and other sumTUI frontends, sumTUI temporarily leaves its alternate screen and restores normal terminal input before launching the shell. Type `exit` (or the shell's normal EOF command) to return to the same BASIC session and redraw the IDE. In `sumbasic --run`, the cbreak mode used by `INKEY$` is likewise suspended while the shell owns the terminal and restored afterward. A bare `SHELL` from a non-interactive pipe has no controlling terminal and reports an error instead.
+
+`SHELL "command"` is stoppable with the IDE's F5 Run/Stop mechanism when it belongs to a running BASIC program; direct-mode shell commands also honor the same stop request. See `docs/SHELL.md` and `examples/shell.bas`.
 
 See `examples/command_line.sh`.
 
@@ -401,7 +425,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a16.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a17.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
@@ -423,7 +447,7 @@ sumbasic --check program.bas
 
 ## Tests
 
-The alpha includes 76 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
+The alpha includes 84 regression tests. The mathematical suite covers arithmetic and integer division, powers/modulo, shifts and bitwise operations, comparisons/logical operations, Spectrum transcendental functions, extended logarithms and roots, rounding, number theory, combinatorics, special functions, decimal promotion, and the `INPUT` prompt-separator rules.
 
 
 ### STOP and CONTINUE

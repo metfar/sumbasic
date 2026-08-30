@@ -1011,3 +1011,60 @@ def test_ide_direct_command_window_runs_basic_without_saving(tmp_path):
     ide._submit_direct_command('A! = 7: PRINT A!', ide.command_view);
     assert any(line == '7' for line, _role in ide.command_view.output);
     assert ide.basic_interpreter.variables['a!'] == 7;
+
+
+def test_shell_command_executes_expression_and_routes_captured_output():
+    commands = [];
+    output = [];
+    basic = BasicInterpreter(
+        output_func=lambda text, end='\n': output.append(str(text) + end),
+        shell_command_func=lambda command: (commands.append(command) or (0, 'one\ntwo\n')),
+    );
+    basic.program.load_text('CMD$ = "ls -1"\nSHELL CMD$\nEND\n');
+    basic.check();
+    basic.run();
+    assert commands == ['ls -1'];
+    assert ''.join(output) == 'one\ntwo\n';
+
+
+def test_bare_shell_uses_interactive_shell_callback():
+    calls = [];
+    basic = BasicInterpreter(
+        output_func=lambda *args, **kwargs: None,
+        shell_interactive_func=lambda: (calls.append('interactive') or 0),
+    );
+    basic.program.load_text('SHELL\nEND\n');
+    basic.check();
+    basic.run();
+    assert calls == ['interactive'];
+
+
+def test_shell_has_separate_output_hook_for_ide_output_window():
+    normal = [];
+    shell = [];
+    basic = BasicInterpreter(
+        output_func=lambda text, end='\n': normal.append(str(text) + end),
+        shell_output_func=lambda text, end='': shell.append(str(text) + end),
+        shell_command_func=lambda command: (0, 'shell-result\n'),
+    );
+    basic.execute_direct('PRINT "direct": SHELL "echo shell-result"');
+    assert ''.join(normal) == 'direct\n';
+    assert ''.join(shell) == 'shell-result\n';
+
+
+def test_ide_direct_shell_sends_shell_text_to_output_not_command_history(tmp_path):
+    from sumbasic.ide import SumBasicIDE;
+    basic = BasicInterpreter(shell_command_func=lambda command: (0, 'from-shell\n'));
+    ide = SumBasicIDE(path=None, interpreter=basic);
+    ide.app.running = False;
+    ide._submit_direct_command('SHELL "printf from-shell"', ide.command_view);
+    ide._poll_run_state();
+    assert 'from-shell' in ide.output_view.text;
+    assert not any('from-shell' in line for line, _role in ide.command_view.output);
+    assert ide.workspace.active_window is ide.output_window;
+
+
+def test_shell_check_accepts_bare_and_command_forms():
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, shell_command_func=lambda command: (0, ''));
+    basic.program.load_text('SHELL "pwd"\nSHELL\nEND\n');
+    assert basic.check();

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a17
+
+- Implemented `SHELL`: bare `SHELL` launches the user's interactive system shell, while `SHELL <string-expression>` runs a host-shell command and captures combined stdout/stderr.
+- IDE shell-command output is routed to the persistent Output window even when the command was entered from the FoxPro-style direct Command window.
+- Bare `SHELL` integrates with sumTUI 0.5.21 terminal handoff, so the IDE/console alternate screen and cbreak input are suspended while the external shell owns the terminal and restored on exit.
+- POSIX shell selection prefers `$SHELL`, then a discoverable `sh`, then Android `/system/bin/sh`; Windows uses `%COMSPEC%`. This keeps the feature compatible with ordinary Linux and Termux-style environments.
+- Host commands observe F5 stop requests while output is being captured; added `docs/SHELL.md`, `examples/shell.bas`, and shell regression coverage. No ASC indices changed because `SHELL` already exists in the historical shared BASIC block.
+- Updated dependency to `sumtui>=0.5.21`. Regression suite: 84 tests.
+
 ## 0.1.0a16
 
 - Migrated the source IDE to the shared sumTUI 0.5.20 overlapping workspace with separate persistent **Code**, **Output**, and **Command** windows. Windows can be moved, activated, maximized/restored, closed, and reopened from the new Window menu.

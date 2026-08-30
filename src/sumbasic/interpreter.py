@@ -29,6 +29,7 @@ from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
 from .expressions import ExpressionEvaluator;
 from .program import BasicProgram;
+from .shell import ShellExecutionError, run_interactive_shell, run_shell_command;
 from .types import BasicArray, base_type, coerce_value, default_value, normalize_type, suffix_type;
 from .vocabulary import GRAPHICS_FUNCTION_STUBS, GRAPHICS_STUBS;
 
@@ -49,7 +50,7 @@ class _BasicStop(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None):
         self.program = BasicProgram();
         self.variables = {};
         self.variable_types = {};
@@ -60,6 +61,9 @@ class BasicInterpreter:
         self.input_func = input_func;
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
+        self.shell_command_func = shell_command_func;
+        self.shell_interactive_func = shell_interactive_func;
+        self.shell_output_func = shell_output_func;
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
         self.audio = AudioEngine(tone_func=tone_func, sleep_func=self.sleep_func);
         self.tone_player = self.audio.sound_player;
@@ -142,6 +146,38 @@ class BasicInterpreter:
             self.output_func(str(text), end=end);
         except TypeError:
             self.output_func(str(text) + ("" if end == "" else end.rstrip("\n")));
+
+    def _emit_shell(self, text):
+        if not text:
+            return None;
+        callback = self.shell_output_func if self.shell_output_func is not None else self.output_func;
+        try:
+            callback(str(text), end="");
+        except TypeError:
+            callback(str(text));
+        return None;
+
+    def _shell_command(self, command):
+        try:
+            if self.shell_command_func is not None:
+                result = self.shell_command_func(str(command));
+            else:
+                result = run_shell_command(str(command), stop_event=self.stop_requested);
+        except ShellExecutionError as exc:
+            raise BasicError(str(exc)) from exc;
+        if isinstance(result, tuple):
+            status, output = result[0], result[1] if len(result) > 1 else "";
+        else:
+            status, output = int(result or 0), "";
+        self._emit_shell(output);
+        return int(status or 0);
+
+    def _shell_interactive(self):
+        try:
+            callback = self.shell_interactive_func if self.shell_interactive_func is not None else run_interactive_shell;
+            return int(callback() or 0);
+        except ShellExecutionError as exc:
+            raise BasicError(str(exc)) from exc;
 
     def _hash_is_channel(self, source, position):
         rest = str(source)[position + 1:];
@@ -337,7 +373,7 @@ class BasicInterpreter:
         text = str(source).strip();
         upper = text.upper();
         if not text or upper.startswith("REM ") or upper == "REM": return True;
-        if upper in ("END", "SYSTEM", "STOP", "CLS", "RETURN", "WEND", "ELSE", "END IF", "ENDIF"):
+        if upper in ("END", "SYSTEM", "STOP", "CLS", "RETURN", "WEND", "ELSE", "END IF", "ENDIF", "SHELL"):
             return True;
         if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return True;
         patterns = (
@@ -364,7 +400,7 @@ class BasicInterpreter:
             r'^NEXT(?:\s+[A-Za-z_][A-Za-z0-9_]*[$%&!]?)?$', r'^WHILE\s+.+$',
             r'^DO(?:\s+(?:WHILE|UNTIL)\s+.+)?$', r'^LOOP(?:\s+(?:WHILE|UNTIL)\s+.+)?$',
             r'^READ\s+.+$', r'^RESTORE(?:\s+.+)?$', r'^SWAP\s+.+?,\s*.+$',
-            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$',
+            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$', r'^SHELL\s+.+$',
             r'^(?:PLAY|ZXPLAY|GWPLAY)\s+.+$',
         );
         if upper.startswith("PRINT") or text.startswith("?"): return True;
@@ -609,6 +645,15 @@ class BasicInterpreter:
         if not text or upper.startswith("REM ") or upper == "REM": return pc + 1;
         if upper in ("END", "SYSTEM"): raise _StopProgram();
         if upper == "STOP": raise _BasicStop(pc + 1, line_number);
+        if upper == "SHELL":
+            self._shell_interactive();
+            return pc + 1;
+        match = re.match(r"^SHELL\s+(.+)$", text, re.I);
+        if match:
+            command = self.expr.eval(match.group(1));
+            self._shell_command(command);
+            self._stop_if_requested();
+            return pc + 1;
         if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return pc + 1;
         if upper == "CLS": self._emit("\033[2J\033[H", end=""); return pc + 1;
         match = re.match(r"^OPTION\s+BASE\s+([01])$", text, re.I);

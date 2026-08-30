@@ -12,6 +12,7 @@ from . import __version__;
 from .console import SumBasicConsoleApp;
 from .ide import SumBasicIDE;
 from .interpreter import BasicError, BasicInterpreter;
+from .shell import run_interactive_shell;
 from .terminal_input import TerminalInput;
 
 
@@ -40,6 +41,7 @@ def _run_loaded(interpreter, interactive_terminal=False):
             with TerminalInput() as terminal:
                 interpreter.input_func = terminal.input;
                 interpreter.inkey_func = terminal.inkey;
+                interpreter.shell_interactive_func = lambda: terminal.run_external(run_interactive_shell);
                 interpreter.run();
                 _finish_audio(interpreter);
             return 0;

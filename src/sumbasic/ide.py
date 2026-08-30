@@ -28,6 +28,7 @@ from sumtui.events import Key, KeyEvent;
 from sumtui.tools.edit import EditApp;
 
 from .interpreter import BasicError, BasicInterpreter;
+from .shell import run_interactive_shell;
 
 
 class _VirtualRunScreen:
@@ -133,6 +134,7 @@ class SumBasicIDE(EditApp):
         self._direct_output_buffer = "";
         self._direct_finished = False;
         self._direct_error = None;
+        self._shell_output_pending = False;
         self.basic_interpreter = interpreter;
         super().__init__(path=path, theme=theme, **kwargs);
         self.output_view = TextView("Ready. Press F5 to run the current editor buffer.");
@@ -155,10 +157,12 @@ class SumBasicIDE(EditApp):
         self.app.set_root(self.desktop);
         self.workspace.activate(self.code_window);
         if self.basic_interpreter is None:
-            self.basic_interpreter = BasicInterpreter(input_func=self._ide_input, output_func=self._basic_output, inkey_func=self._ide_inkey);
+            self.basic_interpreter = BasicInterpreter(input_func=self._ide_input, output_func=self._basic_output, inkey_func=self._ide_inkey, shell_interactive_func=self._interactive_shell, shell_output_func=self._shell_output);
         else:
             self.basic_interpreter.output_func = self._basic_output;
             self.basic_interpreter.inkey_func = self._ide_inkey;
+            self.basic_interpreter.shell_interactive_func = self._interactive_shell;
+            self.basic_interpreter.shell_output_func = self._shell_output;
         self._application_dispatch = self.app.dispatch;
         self.app.dispatch = self._dispatch_event;
         self.app.add_idle(self._poll_run_state);
@@ -213,6 +217,15 @@ class SumBasicIDE(EditApp):
             self._run_dirty = True;
         self._run_screen.write(text, end=end);
         return None;
+
+    def _shell_output(self, text, end=""):
+        self._basic_output(text, end=end);
+        with self._run_lock:
+            self._shell_output_pending = True;
+        return None;
+
+    def _interactive_shell(self):
+        return self.app.run_external(run_interactive_shell);
 
     def _ide_input(self, prompt=""):
         raise BasicError("Interactive INPUT from the source IDE is not implemented yet; run this program in the sumBASIC console for interactive input");
@@ -352,6 +365,10 @@ class SumBasicIDE(EditApp):
     def toggle_run(self):
         if self._run_thread is not None and self._run_thread.is_alive():
             return self.stop_program();
+        if self._direct_thread is not None and self._direct_thread.is_alive():
+            self.basic_interpreter.request_stop();
+            self.status.set("Stopping direct BASIC command...");
+            return True;
         if self.basic_interpreter.can_continue:
             return self.continue_program();
         return self.run_program();
@@ -415,12 +432,17 @@ class SumBasicIDE(EditApp):
             dirty = self._run_dirty;
             finished = self._run_finished;
             error = self._run_error;
+            shell_output_pending = self._shell_output_pending;
             self._run_dirty = False;
+            self._shell_output_pending = False;
         if dirty:
             rendered = self._run_screen.text();
             if rendered:
                 self.output_view.set_text(rendered);
                 self._scroll_output_end();
+        if shell_output_pending:
+            self.workspace.show(self.output_window);
+            dirty = True;
         with self._run_lock:
             direct_finished = self._direct_finished;
         if direct_finished:

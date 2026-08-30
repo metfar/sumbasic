@@ -12,12 +12,14 @@
 from sumtui import Application, CommandWindow, FunctionBar, Menu, MenuBar, MenuDesktop, MenuItem, Panel, Separator, StatusBar, VBox;
 from . import __version__;
 from .interpreter import BasicInterpreter;
+from .shell import run_interactive_shell;
 
 
 class SumBasicConsoleApp:
     def __init__(self, interpreter=None, theme=None):
         self.interpreter = interpreter or BasicInterpreter(output_func=self._output);
         self.app = Application("sumBASIC", theme=theme);
+        self.interpreter.shell_interactive_func = self._interactive_shell;
         self.command = CommandWindow(prompt="> ", on_submit=self._submit);
         self.status = StatusBar("Ready.");
         self.command.write("sumBASIC {} - educational BASIC".format(__version__));
@@ -33,6 +35,9 @@ class SumBasicConsoleApp:
         self.desktop = MenuDesktop(self.menu, body);
         self.app.set_root(self.desktop);
         self.app.focus.set(self.command);
+
+    def _interactive_shell(self):
+        return self.app.run_external(run_interactive_shell);
 
     def _output(self, text, end="\n"):
         value = str(text) + ("" if end == "" else "\n");

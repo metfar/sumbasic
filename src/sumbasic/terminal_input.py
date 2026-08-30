@@ -84,6 +84,18 @@ class TerminalInput:
         finally:
             self._resume_cbreak();
 
+    def run_external(self, callback):
+        """Temporarily restore normal terminal mode for an external program.""";
+        if not callable(callback):
+            raise TypeError("callback must be callable");
+        if not self.enabled or self._windows:
+            return callback();
+        self.restore();
+        try:
+            return callback();
+        finally:
+            self._resume_cbreak();
+
     def _read_posix_bytes(self, timeout=0.0, maximum=16):
         if not self.enabled or self.fd is None:
             return b"";
