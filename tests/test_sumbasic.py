@@ -1068,3 +1068,20 @@ def test_shell_check_accepts_bare_and_command_forms():
     basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, shell_command_func=lambda command: (0, ''));
     basic.program.load_text('SHELL "pwd"\nSHELL\nEND\n');
     assert basic.check();
+
+
+def test_ide_common_shortcuts_program_map_and_scroll_panes(tmp_path):
+    from sumbasic.ide import SumBasicIDE;
+    from sumtui import TextViewPane, CommandWindowPane;
+    path = tmp_path / 'map.bas';
+    path.write_text('PRINT "main"\nSUB Hello\nPRINT "hi"\nEND SUB\n', encoding='utf-8');
+    ide = SumBasicIDE(path=path);
+    assert ide.keys.primary('code.symbols') == 'f2';
+    assert 'alt+p' in ide.keys.bindings_for('code.symbols');
+    assert 'ctrl+q' in ide.keys.bindings_for('app.exit');
+    assert 'ctrl+x' in ide.keys.bindings_for('editor.cut');
+    assert 'ctrl+r' in ide.keys.bindings_for('basic.run');
+    assert isinstance(ide.output_window.child, TextViewPane);
+    assert isinstance(ide.command_window.child, CommandWindowPane);
+    names = {item.name.strip() for item in ide.symbol_map()};
+    assert 'Hello' in names;

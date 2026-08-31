@@ -23,7 +23,7 @@ import queue;
 import re;
 import threading;
 
-from sumtui import CommandWindow, FunctionAction, Menu, MenuItem, Separator, TextView, VBox, Workspace, WorkspaceWindow;
+from sumtui import CommandWindow, CommandWindowPane, FunctionAction, Menu, MenuItem, Separator, TextView, TextViewPane, VBox, Workspace, WorkspaceWindow;
 from sumtui.events import Key, KeyEvent;
 from sumtui.tools.edit import EditApp;
 
@@ -139,6 +139,8 @@ class SumBasicIDE(EditApp):
         super().__init__(path=path, theme=theme, **kwargs);
         self.output_view = TextView("Ready. Press F5 to run the current editor buffer.");
         self.command_view = CommandWindow(prompt="> ", on_submit=self._submit_direct_command);
+        self.output_pane = TextViewPane(self.output_view);
+        self.command_pane = CommandWindowPane(self.command_view);
         title = self.document.path.name if self.document.path is not None else "Untitled";
         available_width = max(40, int(self.app.width));
         available_height = max(12, int(self.app.height) - 3);
@@ -149,8 +151,8 @@ class SumBasicIDE(EditApp):
         command_width = max(28, min(available_width - 2, 44));
         command_height = max(7, min(available_height - 2, 11));
         self.code_window = WorkspaceWindow(self.panel.child, title="Code - {}".format(title), name="code", left=1, top=0, width=code_width, height=code_height, content_style="viewer");
-        self.output_window = WorkspaceWindow(self.output_view, title="Output", name="output", left=3, top=max(1, available_height - output_height), width=output_width, height=output_height, content_style="viewer");
-        self.command_window = WorkspaceWindow(self.command_view, title="Command", name="command", left=max(0, available_width - command_width - 1), top=max(1, available_height - command_height - 1), width=command_width, height=command_height, content_style="command");
+        self.output_window = WorkspaceWindow(self.output_pane, title="Output", name="output", left=3, top=max(1, available_height - output_height), width=output_width, height=output_height, content_style="viewer");
+        self.command_window = WorkspaceWindow(self.command_pane, title="Command", name="command", left=max(0, available_width - command_width - 1), top=max(1, available_height - command_height - 1), width=command_width, height=command_height, content_style="command");
         self.workspace = Workspace(self.output_window, self.command_window, self.code_window);
         body = VBox(self.workspace, self.status, self.bar, sizes=[None, 1, 1]);
         self.desktop.body = body;
@@ -171,7 +173,7 @@ class SumBasicIDE(EditApp):
 
     def _register_keybindings(self):
         super()._register_keybindings();
-        self.keys.register("basic.run", "Run / Stop BASIC", ["f5"], context="editor", callback=self.toggle_run);
+        self.keys.register("basic.run", "Run / Stop BASIC", ["f5", "ctrl+r"], context="editor", callback=self.toggle_run);
         self.keys.register("menu.run", "Run menu", ["alt+r"], context="editor", callback=lambda: self.open_menu(6));
         self.keys.register("menu.help", "Help menu", ["alt+h"], context="editor", callback=lambda: self.open_menu(7));
         return self.keys;

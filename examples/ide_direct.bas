@@ -1,3 +1,4 @@
+# F2 opens Program Map; F5/Ctrl+R runs; F6/Ctrl+Tab changes window; Ctrl+S saves; Ctrl+Q quits.
 # Open this file in the IDE with: sumbasic examples/ide_direct.bas
 # F6 cycles Code -> Output -> Command.
 # In Command try: A! = 10

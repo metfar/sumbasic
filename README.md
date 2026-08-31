@@ -1,12 +1,12 @@
-# sumBASIC 0.1.0a17
+# sumBASIC 0.1.0a18
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
 This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
 
-## Installation note for 0.1.0a17
+## Installation note for 0.1.0a18
 
-Version 0.1.0a17 adds executable `SHELL` support on top of the movable-window IDE: quoted shell commands are captured into BASIC output, while bare `SHELL` can temporarily hand the real terminal to the user's interactive shell and restore the IDE afterward.
+Version 0.1.0a18 keeps the executable `SHELL` support from a17 and moves the IDE onto the common 0.5.22 editor conventions: F2 Program Map, Ctrl+S Save, Ctrl+O Open, Ctrl+X Cut, Ctrl+Q Quit, function-key-free Termux alternatives, protected unsaved buffers, and scrollable Output/Command windows.
 
 Quick verification:
 
@@ -169,14 +169,27 @@ Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. Its workspace co
 The floating **Command** window executes BASIC directly in the same interpreter state. Assignments persist between commands, so `A! = 10` followed by `PRINT A!` prints `10`; sound/music commands can be tried interactively, and `CONTINUE`/`CONT` resumes a program suspended by BASIC `STOP`. Direct commands do not require changing or saving the source buffer.
 
 ```text
-F2        Save
+F2        Program Map / Symbols
 F5        Run / Stop current BASIC buffer
 F6        Next Window (Code / Output / Command)
 F11       Maximize / Restore active window
 Ctrl+F4   Close active window
 F9        Menu
 F10       Exit
+
+Ctrl+S    Save
+Ctrl+O    Open
+Ctrl+F    Find / Search
+Ctrl+X    Cut
+Ctrl+Q    Quit
+Ctrl+R    Run / Stop
+Ctrl+Tab  Next Window
+Alt+P     Program Map
+Alt+Enter Maximize / Restore
+Alt+F/E/S/V/O/W/R/H open the corresponding top menu
 ```
+
+Before New/Open/Quit or closing a modified Code window can discard edits, the IDE asks for **SAVE_AND_EXIT**, **FORGET_AND_EXIT**, or **CANCEL**. Output has visible vertical/horizontal scrollbars and Command has visible scrollback scrolling. These controls are especially useful on Termux, where Alt menu accelerators and Ctrl alternatives avoid any dependency on function keys.
 
 If execution reaches the BASIC statement `STOP`, it is **suspended**, not aborted. The next F5 continues from the statement after `STOP`. Pressing F5 while a program is actively running is a user abort and intentionally does not create a `CONTINUE` point.
 
@@ -425,7 +438,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a17.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a18.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

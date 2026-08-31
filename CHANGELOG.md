@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0a18
+
+- Adopted the common sumTUI 0.5.22 IDE conventions: F2 Program Map, Ctrl+S Save, Ctrl+O Open, Ctrl+F Find, Ctrl+X Cut, Ctrl+Q Quit, F5/Ctrl+R Run/Stop, F6/Ctrl+Tab Next Window and F11/Alt+Enter Maximize/Restore.
+- Added Alt menu accelerators suitable for Termux keyboards without function keys, including Alt+H Help and Alt+P Program Map.
+- New/Open/Quit and closing a modified Code window now require SAVE_AND_EXIT / FORGET_AND_EXIT / CANCEL.
+- Output now uses visible vertical/horizontal scrollbars and Command uses visible scrollback scrolling.
+- Program Map recognizes BASIC SUB/FUNCTION/DEF FN entries plus MAIN.
+- Updated dependencies to `sumtui>=0.5.22` and `sumx>=0.1.10`; no ASC indices changed. Regression suite: 85 tests.
+
 ## 0.1.0a17
 
 - Implemented `SHELL`: bare `SHELL` launches the user's interactive system shell, while `SHELL <string-expression>` runs a host-shell command and captures combined stdout/stderr.
