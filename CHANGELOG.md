@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0a20
+
+- sumBASIC IDE now persists Code, Output and Command workspace geometry across runs using sumTUI 0.5.29.
+- Added **Window -> Reset Window Layout** through the common editor Window menu.
+- Updated the sumTUI dependency to 0.5.29; ASC vocabulary is unchanged from a19.
+
 ## 0.1.0a19
 
 - Updated the IDE dependency to `sumtui>=0.5.28`, so Code/Output/Command windows gain lower-right-corner mouse resizing plus Alt+M keyboard Move and Alt+Z keyboard Resize.

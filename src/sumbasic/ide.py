@@ -153,7 +153,15 @@ class SumBasicIDE(EditApp):
         self.code_window = WorkspaceWindow(self.panel.child, title="Code - {}".format(title), name="code", left=1, top=0, width=code_width, height=code_height, content_style="viewer");
         self.output_window = WorkspaceWindow(self.output_pane, title="Output", name="output", left=3, top=max(1, available_height - output_height), width=output_width, height=output_height, content_style="viewer");
         self.command_window = WorkspaceWindow(self.command_pane, title="Command", name="command", left=max(0, available_width - command_width - 1), top=max(1, available_height - command_height - 1), width=command_width, height=command_height, content_style="command");
-        self.workspace = Workspace(self.output_window, self.command_window, self.code_window);
+        self.workspace = Workspace(
+            self.output_window,
+            self.command_window,
+            self.code_window,
+            layout_id="sumbasic",
+            layout_path=self._workspace_layout_path(),
+            viewport_width=available_width,
+            viewport_height=available_height,
+        );
         body = VBox(self.workspace, self.status, self.bar, sizes=[None, 1, 1]);
         self.desktop.body = body;
         self.app.set_root(self.desktop);
