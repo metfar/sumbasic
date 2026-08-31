@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.1.0a18
+Version: 0.1.0a19
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,20 +10,20 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumtui>=0.5.22
+Requires-Dist: sumtui>=0.5.28
 Requires-Dist: sumx>=0.1.10
 Requires-Dist: rich>=13.0
 Dynamic: license-file
 
-# sumBASIC 0.1.0a18
+# sumBASIC 0.1.0a19
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
 This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
 
-## Installation note for 0.1.0a18
+## Installation note for 0.1.0a19
 
-Version 0.1.0a18 keeps the executable `SHELL` support from a17 and moves the IDE onto the common 0.5.22 editor conventions: F2 Program Map, Ctrl+S Save, Ctrl+O Open, Ctrl+X Cut, Ctrl+Q Quit, function-key-free Termux alternatives, protected unsaved buffers, and scrollable Output/Command windows.
+Version 0.1.0a19 keeps the executable `SHELL` support from a17 and moves the IDE onto the common 0.5.22 editor conventions: F2 Program Map, Ctrl+S Save, Ctrl+O Open, Ctrl+X Cut, Ctrl+Q Quit, function-key-free Termux alternatives, protected unsaved buffers, and scrollable Output/Command windows.
 
 Quick verification:
 
@@ -179,7 +179,7 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## IDE execution
 
-Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, use `Alt+Arrow` for keyboard movement, F11 to maximize/restore, Ctrl+F4 to close the active window, and the **Window** menu to activate or reopen any default window. `F6` cycles Code → Output → Command.
+Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, drag its lower-right corner to resize, use **F11 / Alt+Enter** to maximize/restore, **Alt+M** to enter keyboard Move, **Alt+Z** to enter keyboard Resize, and **Ctrl+F4** to close the active window. In Move/Resize mode, arrows adjust one cell, Shift+arrows five cells, Enter accepts, and Escape cancels. The **Window** menu can activate or reopen any default window, and `F6` cycles Code → Output → Command.
 
 `F5` is a **Run/Stop toggle** for the current editor buffer, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into Output. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source.
 
@@ -272,7 +272,7 @@ PLAY BACKGROUND "T180O5N3cdefg"
 GWPLAY "MB T180 O4 L8 CDEFG"     # Microsoft/GW-BASIC MML
 ```
 
-`PLAY` is deliberately an alias of `ZXPLAY`; `GWPLAY` names the Microsoft dialect explicitly. Foreground/background music uses a separate music bus, so background PLAY can coexist with BEEP and SOUND. See `docs/AUDIO.md`, `docs/PLAY.md`, `examples/sound.bas`, and `examples/music.bas`.
+`PLAY` is deliberately an alias of `ZXPLAY`; `GWPLAY` names the Microsoft dialect explicitly. Foreground/background music uses a separate music bus, so background PLAY can coexist with BEEP and SOUND. See `docs/AUDIO.md`, `docs/PLAY.md`, `examples/sound.bas`, `examples/music.bas`, and `examples/happy_birthday.bas`.
 
 ## DATA, READ and RESTORE
 
@@ -455,7 +455,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a18.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a19.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

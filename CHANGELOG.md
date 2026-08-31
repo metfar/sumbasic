@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0a19
+
+- Updated the IDE dependency to `sumtui>=0.5.28`, so Code/Output/Command windows gain lower-right-corner mouse resizing plus Alt+M keyboard Move and Alt+Z keyboard Resize.
+- Added `examples/happy_birthday.bas`, a short Spectrum-128 `PLAY` teaching example. The final phrase is corrected to F-F-E-C-D-C with a sustained final C.
+- Added regression coverage for the final Happy Birthday phrase so its pitch order and longer ending do not regress.
+- No BASIC vocabulary or ASC token indices changed.
+
 ## 0.1.0a18
 
 - Adopted the common sumTUI 0.5.22 IDE conventions: F2 Program Map, Ctrl+S Save, Ctrl+O Open, Ctrl+F Find, Ctrl+X Cut, Ctrl+Q Quit, F5/Ctrl+R Run/Stop, F6/Ctrl+Tab Next Window and F11/Alt+Enter Maximize/Restore.

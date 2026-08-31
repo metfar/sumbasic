@@ -840,6 +840,17 @@ def test_zxplay_parser_duration_rest_accidental_and_volume():
     assert abs(events[2].duration - .5) < 1e-12;
 
 
+def test_happy_birthday_final_phrase_has_expected_notes_and_ending():
+    from sumbasic.audio import ZXPlayParser;
+    events, _tempo = ZXPlayParser().parse("T120O5N3FF5ECD7C");
+    assert len(events) == 6;
+    frequencies = [event.frequency for event in events];
+    expected_midi = [77, 77, 76, 72, 74, 72];
+    expected = [440.0 * (2.0 ** ((note - 69.0) / 12.0)) for note in expected_midi];
+    for actual, wanted in zip(frequencies, expected):
+        assert abs(actual - wanted) < 1e-9;
+    assert events[-1].duration > events[-2].duration;
+
 def test_gwplay_parser_mml_and_background_marker():
     from sumbasic.audio import MIDDLE_C_HZ, GWPlayParser;
     events, mode = GWPlayParser().parse('MB T120 O4 L4 C');

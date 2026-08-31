@@ -19,7 +19,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 #  
-__version__ = "0.1.0a18";
+__version__ = "0.1.0a19";
 from .interpreter import BasicError, BasicInterpreter;
 from .program import BasicProgram;
 
