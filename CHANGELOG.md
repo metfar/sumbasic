@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0a21
+
+- The BASIC IDE inherits sumTUI 0.6.0 **File -> Compare with...** integration with the separate optional `sumdiff` application.
+- Current unsaved BASIC source is visible in sumdiff without being written first; if the BASIC file is saved inside sumdiff, the IDE reloads it when comparison ends.
+- Updated dependencies to `sumtui>=0.6.0` and `sumx>=0.1.14`. BASIC language/ASC indices are unchanged from a20.
+- Regenerated the append-only ASC companion under the a21 filename. Regression suite: 86 tests.
+
 ## 0.1.0a20
 
 - sumBASIC IDE now persists Code, Output and Command workspace geometry across runs using sumTUI 0.5.29.

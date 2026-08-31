@@ -1,12 +1,12 @@
-# sumBASIC 0.1.0a20
+# sumBASIC 0.1.0a21
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
 This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
 
-## Installation note for 0.1.0a20
+## Installation note for 0.1.0a21
 
-Version 0.1.0a20 keeps the executable `SHELL` support from a17 and moves the IDE onto the common 0.5.22 editor conventions: F2 Program Map, Ctrl+S Save, Ctrl+O Open, Ctrl+X Cut, Ctrl+Q Quit, function-key-free Termux alternatives, protected unsaved buffers, and scrollable Output/Command windows.
+Version 0.1.0a21 keeps the executable `SHELL` support and the common movable IDE, and updates it to sumTUI 0.6.0. When the optional `sumdiff` companion is installed, **File -> Compare with...** opens the current BASIC source together with another text/code file. The live editor buffer is passed directly, so unsaved edits can be compared without writing them first.
 
 Quick verification:
 
@@ -438,7 +438,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a20.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a21.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 
