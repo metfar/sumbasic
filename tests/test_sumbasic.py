@@ -578,7 +578,7 @@ def test_ide_f5_toggles_nonblocking_run_stop_and_f6_switches_windows(tmp_path):
     assert not ide._run_thread.is_alive();
     ide._poll_run_state();
     assert ide.basic_interpreter.stopped_by_request is True;
-    assert ide.status.text == 'Run stopped';
+    assert ide.status.text.endswith('Run stopped');
     ide.app.running = False;
 
 

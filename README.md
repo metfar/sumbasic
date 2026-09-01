@@ -1,12 +1,18 @@
-# sumBASIC 0.1.0a21
+# sumBASIC 0.2.0
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
-This alpha makes the language model substantially more explicit: Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, a substantially expanded mathematical core, and a reserved graphics vocabulary whose backend is still pending.
+The 0.2 line consolidates the modern language/runtime work and separates the IDE shell into the independent `sumIDE` project. Spectrum-compatible `PI`, literal `DATA`, line-aware `RESTORE`, multidimensional arrays, modern type declarations and containers, `DIM SHARED`, `FOR EACH`, the expanded mathematical/audio core, and the existing database/file features remain part of the language.
 
-## Installation note for 0.1.0a21
+## Historical roots: HBasic / HispanoBASIC
 
-Version 0.1.0a21 keeps the executable `SHELL` support and the common movable IDE, and updates it to sumTUI 0.6.0. When the optional `sumdiff` companion is installed, **File -> Compare with...** opens the current BASIC source together with another text/code file. The live editor buffer is passed directly, so unsaved edits can be compared without writing them first.
+The idea behind sumBASIC predates the current implementation by decades. In **1989**, HBasic / HispanoBASIC was conceived as an Advanced BASIC final project: a BASIC dialect in Spanish intended to make programming accessible to people who should not first need English in order to experiment with a computer.
+
+That specific language barrier is much smaller today, so modern sumBASIC uses broadly familiar English BASIC vocabulary. The original goals survived the translation: education, accessibility, readable programs, experimentation, and an environment whose behavior can be inspected and understood. The 2026 implementation is therefore a continuation of the idea, not a claim that source code from 1989 has been preserved.
+
+## IDE/runtime split in 0.2.0
+
+The source-editor shell now lives in the independent `sumIDE` project while the BASIC interpreter/runtime remains in sumBASIC. `sumbasic program.bas` (and bare interactive `sumbasic`) selects the BASIC sumIDE profile; for editing this is equivalent to `sumide --language=basic program.bas`. `--run`, `--check`, `-c/--command`, pipes, and `--plain` remain runtime modes for compatibility. When the optional `sumdiff` companion is installed, **File -> Compare with...** can compare the current source, including unsaved editor text.
 
 Quick verification:
 
@@ -162,7 +168,7 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## IDE execution
 
-Opening a BASIC source file uses the sumBASIC-aware sumTUI IDE. Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, drag its lower-right corner to resize, use **F11 / Alt+Enter** to maximize/restore, **Alt+M** to enter keyboard Move, **Alt+Z** to enter keyboard Resize, and **Ctrl+F4** to close the active window. In Move/Resize mode, arrows adjust one cell, Shift+arrows five cells, Enter accepts, and Escape cancels. The **Window** menu can activate or reopen any default window, and `F6` cycles Code → Output → Command.
+Opening a BASIC source file now uses the common `sumIDE --language=basic` workspace. Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, drag its lower-right corner to resize, use **F11 / Alt+Enter** to maximize/restore, **Alt+M** to enter keyboard Move, **Alt+Z** to enter keyboard Resize, and **Ctrl+F4** to close the active window. In Move/Resize mode, arrows adjust one cell, Shift+arrows five cells, Enter accepts, and Escape cancels. The **Window** menu can activate or reopen any default window, and `F6` cycles Code → Output → Command.
 
 `F5` is a **Run/Stop toggle** for the current editor buffer, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into Output. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source.
 
@@ -186,7 +192,10 @@ Ctrl+R    Run / Stop
 Ctrl+Tab  Next Window
 Alt+P     Program Map
 Alt+Enter Maximize / Restore
-Alt+F/E/S/V/O/W/R/H open the corresponding top menu
+Alt+F/E/S/V/O/I/R/H open the corresponding top menu
+Alt+W     Delete through next word boundary
+Ctrl+Alt+W Delete previous word/separator segment
+Tab/Shift+Tab Indent/unindent selected lines
 ```
 
 Before New/Open/Quit or closing a modified Code window can discard edits, the IDE asks for **SAVE_AND_EXIT**, **FORGET_AND_EXIT**, or **CANCEL**. Output has visible vertical/horizontal scrollbars and Command has visible scrollback scrolling. These controls are especially useful on Termux, where Alt menu accelerators and Ctrl alternatives avoid any dependency on function keys.
@@ -438,7 +447,7 @@ Random fixed-record access, `FIELD`, `GET`, `PUT`, standard streams, pipelines a
 
 The supplied `asc_h.py` is treated as a shared Sum symbol catalogue. Its existing BASIC block begins at `ASC[512]` with `RND`, `INKEY$`, `PI`, etc. Existing positions are not renumbered.
 
-The companion `extras/asc_h-sumbasic-0.1.0a21.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
+The companion `extras/asc_h-sumbasic-0.1.0a22.py` appends the newer sumBASIC vocabulary starting at index `2990`, after the existing 2990 entries. This preserves every historical code while still giving `SUB`, `FUNCTION`, `CALL`, `SHARED`, the modern types, structured-loop words and newer runtime vocabulary stable ASC positions.
 
 The parser does not depend on those numeric positions; they remain a cross-project symbol space rather than parser opcodes.
 

@@ -10,7 +10,6 @@ from pathlib import Path;
 
 from . import __version__;
 from .console import SumBasicConsoleApp;
-from .ide import SumBasicIDE;
 from .interpreter import BasicError, BasicInterpreter;
 from .shell import run_interactive_shell;
 from .terminal_input import TerminalInput;
@@ -26,8 +25,10 @@ def _plain_repl(interpreter):
         except Exception as exc: print("Error: {}".format(exc), file=sys.stderr);
 
 
-def _edit_file(path):
-    return int(SumBasicIDE(path=path).run() or 0);
+def _edit_file(path=None):
+    from sumide.app import main_basic;
+    argv = [] if path is None else [str(path)];
+    return int(main_basic(argv) or 0);
 
 
 def _finish_audio(interpreter):
@@ -83,6 +84,8 @@ def main(argv=None):
     if args.file and args.command is not None:
         parser.error("a source file and --command/-c cannot be used together");
     if args.file and not (args.run or args.check): return _edit_file(args.file);
+    if not args.file and args.command is None and not args.run and not args.check and not args.plain and bool(getattr(sys.stdin, "isatty", lambda: False)()):
+        return _edit_file(None);
     interpreter = BasicInterpreter();
     if args.command is not None:
         interpreter.program.load_text(str(args.command) + ("" if str(args.command).endswith("\n") else "\n"));

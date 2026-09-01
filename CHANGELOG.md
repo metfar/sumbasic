@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0 - 2026-09-01
+
+- Started the post-split sumBASIC release line: the BASIC interpreter/runtime remains in `sumBASIC`, while normal source editing is delegated to the independent `sumIDE` BASIC profile. A positional `sumbasic program.bas` remains the compatibility entry point and is equivalent, for editing purposes, to `sumide --language=basic program.bas`.
+- Preserved runtime-oriented CLI modes (`--run`, `--check`, `-c/--command`, `--plain`, pipes) in sumBASIC so existing programs and scripts do not lose their execution interface.
+- Retained `sumbasic.ide.SumBasicIDE` as the BASIC language backend attached to the common IDE shell. It preserves non-blocking F5 Run/Stop, STOP/CONTINUE, live INKEY$ routing, ANSI-aware CLS/LOCATE output and stateful direct BASIC commands without reintroducing a separate editor/workspace implementation.
+- Adopted the current editor foundation from `sumTUI 0.7.0`: safe Vim modelines, centralized preferences, four-column defaults, `Alt+W`/`Ctrl+Alt+W`, block indentation, tabs/spaces conversion and the `Alt+I` Window mnemonic.
+- Added the documented historical root of the project: `sumBASIC` descends conceptually from **HBasic / HispanoBASIC**, conceived in 1989 as an Advanced BASIC final project intended to make programming more accessible through a Spanish-language BASIC. The modern project keeps the educational/accessibility motivation without requiring Spanish keywords.
+- No ASC/token positions are renumbered by this release.
+- Requires `sumTUI >= 0.7.0`, `sumIDE >= 0.2.0` and `sumX >= 0.2.0`.
+
+## 0.1.0a23
+
+- Moved the source-editing/IDE frontend to the independent `sumIDE` project. A positional `sumbasic program.bas` now opens `sumIDE --language=basic program.bas`; bare interactive `sumbasic` also opens the BASIC IDE profile.
+- Preserved interpreter-oriented command-line modes: `--run`, `--check`, `-c/--command` and `--plain` still execute through the sumBASIC runtime rather than recursively entering the IDE.
+- Replaced the historical `sumbasic.ide.SumBasicIDE` implementation with a compatibility wrapper around `sumide.app.ScriptIDE`, so existing imports keep working while there is only one IDE implementation.
+- Requires `sumTUI >= 0.6.2`, `sumIDE >= 0.1.0a1` and `sumX >= 0.1.16`.
+
+## 0.1.0a22
+
+- The BASIC IDE inherits sumTUI 0.6.1 Alt+W / Ctrl+Alt+W deletion, block Tab/Shift+Tab indentation and whole-file tab/space conversion.
+- The Window menu accelerator is now **Alt+I** so Alt+W remains an editor command.
+- Updated dependencies to `sumtui>=0.6.1` and `sumx>=0.1.15`. BASIC vocabulary/ASC indices are unchanged.
+- Republished the append-only ASC companion under the a22 filename. Regression suite: 86 tests.
+
 ## 0.1.0a21
 
 - The BASIC IDE inherits sumTUI 0.6.0 **File -> Compare with...** integration with the separate optional `sumdiff` application.

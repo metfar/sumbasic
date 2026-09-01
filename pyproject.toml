@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sumbasic"
-version = "0.1.0a21"
+version = "0.2.0"
 description = "Educational BASIC interpreter and Sum ecosystem frontend."
 readme = "README.md"
 requires-python = ">=3.8"
 license = "GPL-2.0-or-later"
 authors = [{ name = "William Martinez Bas", email = "metfar@gmail.com" }]
-dependencies = ["sumtui>=0.6.0", "sumx>=0.1.14", "rich>=13.0"]
+dependencies = ["sumtui>=0.7.0", "sumide>=0.2.0", "sumx>=0.2.0", "rich>=13.0"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: 3",
