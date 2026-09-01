@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.3 - 2026-09-01
+
+- Kept `help.md` as the canonical editable BASIC reference while switching runtime loading to the generated `help.helpdb` cache.
+- `.helpdb` generation is now owned by SumDoc 0.2.1; sumBASIC consumes the compiled format without requiring the conversion toolkit at runtime.
+- Added `help.helpdb` to package data and preserved the `sumbasic.helpdb` provider API used by sumIDE.
+- Kept all help examples, aliases, F2 topic-map navigation, scrollbars, and example-copy behavior unchanged.
+
+## 0.2.2 - 2026-09-01
+
+- Moved the canonical BASIC reference out of Python literals into the editable packaged `sumbasic/help.md`.
+- `helpdb.py` became a compatibility adapter over the Markdown corpus shared with sumIDE.
+
+## 0.2.1 - 2026-09-01
+
+- Added an example-driven BASIC help database for the common sumIDE help explorer.
+- F1 from a BASIC buffer now opens BASIC language help; Ctrl+F1 opens generic editor help.
+- Functional help examples can be copied with F6 or Ctrl+C.
+
 ## 0.2.0 - 2026-09-01
 
 - Started the post-split sumBASIC release line: the BASIC interpreter/runtime remains in `sumBASIC`, while normal source editing is delegated to the independent `sumIDE` BASIC profile. A positional `sumbasic program.bas` remains the compatibility entry point and is equivalent, for editing purposes, to `sumide --language=basic program.bas`.

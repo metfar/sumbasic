@@ -1096,3 +1096,28 @@ def test_ide_common_shortcuts_program_map_and_scroll_panes(tmp_path):
     assert isinstance(ide.command_window.child, CommandWindowPane);
     names = {item.name.strip() for item in ide.symbol_map()};
     assert 'Hello' in names;
+
+
+def test_every_help_topic_has_a_functional_example():
+    from sumbasic.helpdb import TOPICS, find_topic, index_markdown, topic_names;
+    assert "sumBASIC Help" in index_markdown();
+    assert topic_names();
+    for topic in TOPICS.values():
+        assert topic.example.strip(), topic.name;
+        assert "Functional example" in topic.markdown();
+        checker = BasicInterpreter();
+        checker.program.load_text(topic.example);
+        checker.check();
+    assert find_topic("?").name == "PRINT";
+    assert find_topic("CONTINUE").name == "STOP";
+
+
+def test_sumbasic_help_uses_packaged_compiled_database_with_editable_source():
+    from importlib.resources import files;
+    from sumbasic.helpdb import CORPUS, find_topic;
+    source = files("sumbasic").joinpath("help.md").read_text(encoding="utf-8");
+    compiled = files("sumbasic").joinpath("help.helpdb").read_text(encoding="utf-8");
+    assert "# sumBASIC Help" in source;
+    assert '"schema_version": 1' in compiled;
+    assert len(CORPUS.topics) >= 10;
+    assert find_topic("?").name == "PRINT";

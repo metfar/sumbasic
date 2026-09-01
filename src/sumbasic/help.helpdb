@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "title": "sumBASIC Help",
+  "intro": "The BASIC reference is example-driven. Select a topic and copy or run its functional example.",
+  "topics": [
+    {
+      "name": "PRINT",
+      "category": "Console I/O",
+      "summary": "Writes values to the current output stream.",
+      "syntax": [
+        "PRINT expression",
+        "PRINT expression;",
+        "? expression"
+      ],
+      "example": "name$ = \"Ada\"\nPRINT \"Hello \"; name$\n? 2 + 2",
+      "notes": [
+        "A trailing semicolon suppresses the normal newline where supported.",
+        "? is the short PRINT form."
+      ],
+      "see_also": [
+        "INPUT",
+        "LOCATE"
+      ],
+      "aliases": [
+        "?"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "INPUT",
+      "category": "Console I/O",
+      "summary": "Reads a value from the user into a variable.",
+      "syntax": [
+        "INPUT variable",
+        "INPUT \"Prompt\"; variable",
+        "INPUT \"Prompt\", variable"
+      ],
+      "example": "INPUT \"Name\"; name$\nPRINT \"Hello \"; name$",
+      "notes": [
+        "With a semicolon after the prompt",
+        "sumBASIC displays the traditional \"? \" prompt marker.",
+        "With a comma after the prompt",
+        "input follows the prompt directly."
+      ],
+      "see_also": [
+        "PRINT",
+        "INKEY$"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "IF",
+      "category": "Programming",
+      "summary": "Executes code conditionally.",
+      "syntax": [
+        "IF condition THEN statement",
+        "IF condition THEN",
+        "    statements",
+        "ELSE",
+        "    statements",
+        "END IF"
+      ],
+      "example": "age = 20\nIF age >= 18 THEN\n    PRINT \"adult\"\nELSE\n    PRINT \"minor\"\nEND IF",
+      "notes": [],
+      "see_also": [
+        "FOR",
+        "WHILE",
+        "DO"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "FOR",
+      "category": "Programming",
+      "summary": "Repeats a block while a numeric control variable advances toward a limit.",
+      "syntax": [
+        "FOR variable = first TO last [STEP step]",
+        "NEXT [variable]"
+      ],
+      "example": "FOR i = 1 TO 5\n    PRINT i\nNEXT i",
+      "notes": [],
+      "see_also": [
+        "WHILE",
+        "DO"
+      ],
+      "aliases": [
+        "NEXT"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "WHILE",
+      "category": "Programming",
+      "summary": "Repeats a block while its condition remains true.",
+      "syntax": [
+        "WHILE condition",
+        "WEND"
+      ],
+      "example": "i = 1\nWHILE i <= 3\n    PRINT i\n    i = i + 1\nWEND",
+      "notes": [],
+      "see_also": [
+        "FOR",
+        "DO"
+      ],
+      "aliases": [
+        "WEND"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "DO",
+      "category": "Programming",
+      "summary": "Provides DO/LOOP structured repetition, optionally controlled by WHILE or UNTIL.",
+      "syntax": [
+        "DO",
+        "LOOP",
+        "DO WHILE condition",
+        "LOOP UNTIL condition"
+      ],
+      "example": "i = 0\nDO\n    i = i + 1\n    PRINT i\nLOOP UNTIL i >= 3",
+      "notes": [],
+      "see_also": [
+        "WHILE",
+        "FOR"
+      ],
+      "aliases": [
+        "LOOP"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "DATA",
+      "category": "Programming",
+      "summary": "Stores literal data in the program for sequential READ operations.",
+      "syntax": [
+        "DATA value [, value ...]",
+        "READ variable [, variable ...]",
+        "RESTORE [line-or-label]"
+      ],
+      "example": "DATA \"red\", \"green\", \"blue\"\nREAD a$, b$\nPRINT a$; \" \"; b$\nRESTORE\nREAD c$\nPRINT c$",
+      "notes": [
+        "RESTORE without an argument rewinds the DATA pointer.",
+        "Named labels may identify DATA blocks."
+      ],
+      "see_also": [
+        "READ",
+        "RESTORE"
+      ],
+      "aliases": [
+        "READ",
+        "RESTORE"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "DIM",
+      "category": "Data",
+      "summary": "Creates arrays using BASIC dimensions.",
+      "syntax": [
+        "DIM name(size)",
+        "DIM name(rows, columns)"
+      ],
+      "example": "DIM table(2, 2)\ntable(1, 1) = 42\nPRINT table(1, 1)",
+      "notes": [],
+      "see_also": [
+        "LBOUND",
+        "UBOUND",
+        "REDIM"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "BEEP",
+      "category": "Audio",
+      "summary": "Plays a ZX Spectrum-style note using duration then semitone pitch offset from middle C.",
+      "syntax": [
+        "BEEP duration, pitch"
+      ],
+      "example": "BEEP .15, 0\nBEEP .15, 4\nBEEP .15, 7\nBEEP .3, 12",
+      "notes": [
+        "0 is middle C; +12 is one octave above and -12 one octave below.",
+        "BEEP is intentionally blocking."
+      ],
+      "see_also": [
+        "SOUND",
+        "PLAY"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "SOUND",
+      "category": "Audio",
+      "summary": "Plays a GW-BASIC-style tone using frequency and duration.",
+      "syntax": [
+        "SOUND frequency, duration"
+      ],
+      "example": "SOUND 440, .25\nSOUND 660, .25",
+      "notes": [
+        "SOUND and BEEP intentionally keep different historical argument semantics."
+      ],
+      "see_also": [
+        "BEEP",
+        "PLAY"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "PLAY",
+      "category": "Audio",
+      "summary": "Plays music using the BASIC music-string facilities.",
+      "syntax": [
+        "PLAY string-expression",
+        "ZXPLAY string-expression",
+        "GWPLAY string-expression"
+      ],
+      "example": "PLAY \"C D E F G\"",
+      "notes": [],
+      "see_also": [
+        "BEEP",
+        "SOUND"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "SHELL",
+      "category": "Environment",
+      "summary": "Runs a host shell command or opens an interactive shell when used without a command.",
+      "syntax": [
+        "SHELL",
+        "SHELL string-expression"
+      ],
+      "example": "SHELL \"printf 'hello from the shell\\n'\"",
+      "notes": [
+        "The configured host shell is used; sumBASIC does not implement a second shell parser."
+      ],
+      "see_also": [
+        "SYSTEM"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "STOP",
+      "category": "Programming",
+      "summary": "Suspends a running BASIC program while preserving state for CONTINUE.",
+      "syntax": [
+        "STOP",
+        "CONTINUE",
+        "CONT"
+      ],
+      "example": "PRINT \"before\"\nSTOP\nPRINT \"after\"",
+      "notes": [
+        "STOP is resumable; END and a user-requested IDE stop are not.",
+        "In the IDE",
+        "F5 resumes when the previous run stopped at STOP."
+      ],
+      "see_also": [
+        "CONTINUE",
+        "END"
+      ],
+      "aliases": [
+        "CONT",
+        "CONTINUE"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "INKEY$",
+      "category": "Console I/O",
+      "summary": "Returns a pending key immediately, or an empty string when no key is waiting.",
+      "syntax": [
+        "INKEY$"
+      ],
+      "example": "PRINT \"Press Q to quit\"\nDO\n    k$ = INKEY$\nLOOP UNTIL UCASE$(k$) = \"Q\"",
+      "notes": [
+        "Interactive --run mode places POSIX terminals in cbreak mode so INKEY$ does not wait for Enter."
+      ],
+      "see_also": [
+        "INPUT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "OPEN",
+      "category": "Files",
+      "summary": "Opens BASIC file/channel I/O resources.",
+      "syntax": [
+        "OPEN ...",
+        "OPEN # ...",
+        "CLOSE #channel",
+        "FREEFILE"
+      ],
+      "example": "OPEN \"example.txt\" FOR OUTPUT AS #1\nWRITE #1, \"hello\"\nCLOSE #1",
+      "notes": [],
+      "see_also": [
+        "GET",
+        "PUT",
+        "WRITE",
+        "EOF",
+        "LOF",
+        "LOC"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "MATH",
+      "category": "Functions",
+      "summary": "sumBASIC includes classic BASIC/Spectrum functions plus an extended mathematical vocabulary.",
+      "syntax": [
+        "SIN(x)  COS(x)  TAN(x)",
+        "SQR(x)  SQRT(x)  ABS(x)",
+        "LOG(x)  LOG10(x)  LOG2(x)",
+        "GCD(a,b)  LCM(a,b)  FACT(n)"
+      ],
+      "example": "PRINT SIN(PI / 2)\nPRINT SQRT(81)\nPRINT GCD(84, 30)",
+      "notes": [
+        "PI follows the Spectrum-inspired BASIC vocabulary."
+      ],
+      "see_also": [],
+      "aliases": [
+        "SQR",
+        "SQRT"
+      ],
+      "language": "basic"
+    }
+  ]
+}

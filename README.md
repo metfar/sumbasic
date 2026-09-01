@@ -1,4 +1,4 @@
-# sumBASIC 0.2.0
+# sumBASIC 0.2.1
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -168,7 +168,7 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## IDE execution
 
-Opening a BASIC source file now uses the common `sumIDE --language=basic` workspace. Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, drag its lower-right corner to resize, use **F11 / Alt+Enter** to maximize/restore, **Alt+M** to enter keyboard Move, **Alt+Z** to enter keyboard Resize, and **Ctrl+F4** to close the active window. In Move/Resize mode, arrows adjust one cell, Shift+arrows five cells, Enter accepts, and Escape cancels. The **Window** menu can activate or reopen any default window, and `F6` cycles Code → Output → Command.
+Opening a BASIC source file now uses the common `sumIDE --language=basic` workspace. **F1 opens the sumBASIC language reference for the active BASIC buffer; Ctrl+F1 opens generic editor help. The language help explorer supports F3 search and F6/Ctrl+C to copy the current functional example.** Its workspace contains three independent default windows: **Code**, **Output**, and **Command**. They can overlap like a classic FoxPro-style desktop: drag a title border to move a window, drag its lower-right corner to resize, use **F11 / Alt+Enter** to maximize/restore, **Alt+M** to enter keyboard Move, **Alt+Z** to enter keyboard Resize, and **Ctrl+F4** to close the active window. In Move/Resize mode, arrows adjust one cell, Shift+arrows five cells, Enter accepts, and Escape cancels. The **Window** menu can activate or reopen any default window, and `F6` cycles Code → Output → Command.
 
 `F5` is a **Run/Stop toggle** for the current editor buffer, including unsaved edits, without silently saving or modifying the source file. Execution is asynchronous with respect to the IDE: the editor/event loop remains responsive while BASIC runs, and output is streamed into Output. `CLS` and `LOCATE` are interpreted by the IDE run screen, so terminal-style programs such as the retro clock can update in place rather than dumping raw ANSI escape sequences. While an F5 program is running, printable keys and Escape are delivered to its `INKEY$` queue instead of editing the source.
 
@@ -494,5 +494,11 @@ GPL-2.0-or-later.
 ### Persistent IDE window layout
 
 The sumBASIC IDE remembers Code, Output and Command window position, size and maximized state when it closes. **Window -> Reset Window Layout** immediately restores the default geometry and clears the saved layout for the next launch.
+
+### Editable BASIC reference
+
+The canonical BASIC reference is `src/sumbasic/help.md`, rather than a collection of help strings embedded in Python. SumDoc generates `help.helpdb`, which is shipped as the runtime cache, while `sumbasic.helpdb` remains the compatibility provider for sumIDE and other consumers. The common sumIDE language-help browser provides scrollbars, F2 Topic Map navigation, search, and direct example copying.
+
+After editing `help.md`, regenerate the runtime database with SumDoc's `markdown2helpdb`; `helpdb2markdown` provides the reverse conversion.
 
 <p align=center><b>- oOo -<b></p>
