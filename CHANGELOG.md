@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4 - 2026-09-01
+
+- Adopted the sumIDE 0.2.4 three-window startup layout: Code is visible above Output and Command instead of hiding the development panes behind the editor.
+- F5 Run and CONTINUE explicitly reveal/activate Output before BASIC execution, while preserving the existing non-blocking Run/Stop and INKEY$ behavior.
+- Inherits the common resizable Code/Output/Command workspace and automatic Markdown map behavior from sumTUI/sumIDE.
+
 ## 0.2.3 - 2026-09-01
 
 - Kept `help.md` as the canonical editable BASIC reference while switching runtime loading to the generated `help.helpdb` cache.

@@ -566,13 +566,16 @@ def test_ide_f5_toggles_nonblocking_run_stop_and_f6_switches_windows(tmp_path):
     assert ide._run_thread is not None and ide._run_thread.is_alive();
     assert ide.keys.primary('basic.run') == 'f5';
     assert ide.keys.primary('window.next') == 'f6';
-    ide.app.focus.set(ide.editor);
-    ide.switch_window();
+    # F5 deliberately exposes and activates Output. F6 then walks the
+    # remaining visible workspace windows in z-order.
+    assert ide.workspace.active_window is ide.output_window;
     assert ide.app.focus.current is ide.output_view;
     ide.switch_window();
     assert ide.app.focus.current is ide.command_view;
     ide.switch_window();
     assert ide.app.focus.current is ide.editor;
+    ide.switch_window();
+    assert ide.app.focus.current is ide.output_view;
     ide.toggle_run();
     ide._run_thread.join(timeout=2.0);
     assert not ide._run_thread.is_alive();

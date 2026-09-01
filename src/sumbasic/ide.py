@@ -204,6 +204,8 @@ class SumBasicIDE(ScriptIDE):
         return self._application_dispatch(event);
 
     def _prepare_run(self):
+        self.workspace.show(self.output_window);
+        self.workspace.activate(self.output_window);
         while True:
             try:
                 self._inkey_queue.get_nowait();
@@ -346,6 +348,8 @@ class SumBasicIDE(ScriptIDE):
         if not self.basic_interpreter.can_continue:
             self._update_status("No BASIC STOP to continue from.");
             return True;
+        self.workspace.show(self.output_window);
+        self.workspace.activate(self.output_window);
         with self._run_lock:
             self._run_finished = False;
             self._run_error = None;
