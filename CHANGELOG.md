@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5 - 2026-09-01
+
+- Updated to sumTUI 0.7.5 / sumIDE 0.2.5 / sumX 0.2.6 so bounded interactive fields inherit the common logical-end editing policy rather than rejecting keystrokes at maximum length.
+- BASIC language/token behavior is unchanged by this compatibility patch.
+
 ## 0.2.4 - 2026-09-01
 
 - Adopted the sumIDE 0.2.4 three-window startup layout: Code is visible above Output and Command instead of hiding the development panes behind the editor.
