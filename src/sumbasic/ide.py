@@ -34,6 +34,7 @@ from sumide.app import ScriptIDE;
 from sumtui.events import Key, KeyEvent;
 
 from .interpreter import BasicError, BasicInterpreter;
+from .graphics import SumGuiGraphicsHandler;
 from .shell import run_interactive_shell;
 
 
@@ -146,12 +147,15 @@ class SumBasicIDE(ScriptIDE):
                 inkey_func=self._ide_inkey,
                 shell_interactive_func=self._interactive_shell,
                 shell_output_func=self._shell_output,
+                graphics_handler=SumGuiGraphicsHandler(title="sumBASIC graphics"),
             );
         else:
             self.basic_interpreter.output_func = self._basic_output;
             self.basic_interpreter.inkey_func = self._ide_inkey;
             self.basic_interpreter.shell_interactive_func = self._interactive_shell;
             self.basic_interpreter.shell_output_func = self._shell_output;
+            if getattr(self.basic_interpreter.graphics, "handler", None) is None:
+                self.basic_interpreter.graphics.set_handler(SumGuiGraphicsHandler(title="sumBASIC graphics"));
         self._application_dispatch = self.app.dispatch;
         self.app.dispatch = self._dispatch_event;
         self.app.add_idle(self._poll_run_state);
@@ -385,7 +389,28 @@ class SumBasicIDE(ScriptIDE):
         self._update_status("Stopping BASIC program...");
         return True;
 
+    def _quit_now(self):
+        handler = getattr(getattr(self.basic_interpreter, "graphics", None), "handler", None);
+        close = getattr(handler, "close", None);
+        if close is not None:
+            close();
+        return super()._quit_now();
+
+    def _poll_graphics(self):
+        handler = getattr(getattr(self.basic_interpreter, "graphics", None), "handler", None);
+        window = getattr(handler, "window", None);
+        if window is None or getattr(window, "closed", False):
+            return False;
+        try:
+            window.poll();
+            if not window.closed:
+                window.present();
+        except Exception:
+            return False;
+        return True;
+
     def _poll_run_state(self):
+        graphics_dirty = self._poll_graphics();
         with self._run_lock:
             dirty = self._run_dirty;
             finished = self._run_finished;
@@ -426,4 +451,4 @@ class SumBasicIDE(ScriptIDE):
             with self._run_lock:
                 self._run_finished = False;
             return True;
-        return dirty;
+        return dirty or graphics_dirty;

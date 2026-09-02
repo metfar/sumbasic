@@ -35,6 +35,14 @@ class GraphicsRuntime:
         self.commands = [];
         return self;
 
+    def text_mode(self):
+        had_mode = self.mode is not None;
+        self.mode = None;
+        self.commands = [];
+        if had_mode and self.handler is not None:
+            self.handler(GraphicsCommand("close"));
+        return self;
+
     def set_mode(self, mode):
         if not isinstance(mode, GraphicsMode):
             mode = GraphicsMode.from_dict(mode);
@@ -70,3 +78,43 @@ class GraphicsRuntime:
     def program(self):
         mode = self.ensure_mode();
         return GraphicsProgram(mode, tuple(self.commands), background=self.background);
+
+
+class GraphicsBackendError(RuntimeError):
+    """Raised when a requested graphics backend cannot be started.""";
+
+
+class SumGuiGraphicsHandler:
+    """Lazy sumGUI bridge used by the BASIC CLI and IDE.
+
+    Importing ``sumbasic`` stays Pygame-free until the first graphics command.
+    The concrete renderer remains backend-neutral from the interpreter's point
+    of view: it receives only ``GraphicsMode`` and ``GraphicsCommand`` values.
+    """;
+    def __init__(self, title="sumBASIC graphics", fit_display=True):
+        self.title = str(title);
+        self.fit_display = bool(fit_display);
+        self.window = None;
+
+    def _ensure_window(self):
+        if self.window is not None:
+            return self.window;
+        try:
+            from sumgui.graphics import GraphicsWindow;
+        except (ImportError, ModuleNotFoundError) as exc:
+            raise GraphicsBackendError("sumBASIC graphics require sumGUI/Pygame; install the graphics extra with: pip install 'sumbasic[graphics]'") from exc;
+        self.window = GraphicsWindow(title=self.title, fit_display=self.fit_display);
+        return self.window;
+
+    def __call__(self, item):
+        return self._ensure_window().handle(item);
+
+    def finish(self, wait=False):
+        if self.window is None:
+            return 0;
+        return self.window.finish(wait=wait);
+
+    def close(self):
+        if self.window is not None:
+            self.window.close();
+        return None;

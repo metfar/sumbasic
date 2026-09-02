@@ -111,7 +111,7 @@ class BasicInterpreter:
         self.option_base = 0;
         self._resume_context = None;
         self.stopped_by_statement = False;
-        self.graphics.reset();
+        self.graphics.text_mode();
 
     def _db(self):
         if self.database is None: self.database = BasicDatabase(max_areas=10);
@@ -986,6 +986,12 @@ class BasicInterpreter:
                 self.graphics.spectrum();
                 return True;
             values = self._graphics_value_list(body);
+            if len(values) == 1 and int(values[0]) == 1:
+                self.graphics.spectrum();
+                return True;
+            if len(values) == 1 and int(values[0]) == 0:
+                self.graphics.text_mode();
+                return True;
             if len(values) == 2:
                 self.graphics.modern(int(values[0]), int(values[1]));
                 return True;

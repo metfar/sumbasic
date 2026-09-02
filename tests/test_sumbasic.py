@@ -1135,3 +1135,24 @@ def test_sumbasic_help_uses_packaged_compiled_database_with_editable_source():
     assert '"schema_version": 1' in compiled;
     assert len(CORPUS.topics) >= 10;
     assert find_topic("?").name == "PRINT";
+
+
+def test_screen_one_selects_spectrum_graphics_profile():
+    basic, out = runner('SCREEN 1\nPLOT 10, 20\n');
+    assert out == '';
+    assert basic.graphics.mode.profile == "spectrum";
+    assert basic.graphics.mode.size == (256, 192);
+
+
+def test_graphics_handler_receives_modes_commands_and_text_mode_close():
+    from sumui import GraphicsCommand, GraphicsMode;
+    events = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=events.append);
+    basic.program.load_text('SCREEN 1\nINK 6\nPLOT 10, 20\nSCREEN 0\n');
+    basic.run();
+    assert isinstance(events[0], GraphicsMode);
+    assert events[0].profile == "spectrum";
+    assert isinstance(events[1], GraphicsCommand);
+    assert events[1].operation == "ink";
+    assert events[2].operation == "plot";
+    assert events[3].operation == "close";

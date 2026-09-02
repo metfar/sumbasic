@@ -64,5 +64,5 @@ class SumBasicConsoleApp:
         self.command.write("sumBASIC {} | console BASIC frontend for the Sum ecosystem".format(__version__));
         return True;
 
-    def run(self):
-        return self.app.run();
+    def run(self, backend="tui"):
+        return self.app.run(backend=backend);

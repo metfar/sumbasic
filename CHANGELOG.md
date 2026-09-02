@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.9 - 2026-09-02
+- Updated coordinated dependencies so sumBASIC TUI and `--gui` modes inherit the common ZX default and the current shared application renderer.
+- No BASIC language-surface change in this release.
+
+## 0.2.8 - 2026-09-02
+
+- Added common presentation selection: `sumbasic --gui [FILE]` opens the same sumBASIC/sumIDE application object through sumGUI; TUI remains the default.
+- The console application can also run through the selected backend, without creating a second BASIC UI implementation.
+- BASIC syntax highlighting, menus, Code/Output/Command windows, help, configuration, theme, keyboard and mouse behavior therefore remain properties of the shared application.
+- Existing `SCREEN`/graphics output remains a separate logical graphics surface rendered by sumGUI; choosing `--gui` changes the IDE/application presentation and does not change BASIC language semantics.
+- Updated coordinated dependencies to sumUI 0.1.0a4, sumTUI 0.8.0a5, sumIDE 0.2.10, sumX 0.2.10 and optional sumGUI 0.2.0a6.
+
+## 0.2.7 - 2026-09-02
+
+- Connected the existing backend-neutral BASIC graphics stream to sumGUI/Pygame. `SCREEN 1` now opens the Spectrum 256x192 profile, `SCREEN width,height` opens a modern logical canvas, and drawing commands are presented instead of silently accumulating an unused command stream.
+- `SCREEN 0` closes the graphics window and returns to text mode. CLI runs keep an interactive graphics window visible at program completion; non-interactive runs close it cleanly.
+- The IDE installs the same lazy graphics handler and pumps the graphical window while BASIC execution/output remains in the common sumIDE shell.
+- Added the optional `graphics` extra (`sumgui>=0.2.0a4`) so importing or using text-only sumBASIC does not require Pygame.
+
 ## 0.2.5 - 2026-09-01
 
 - Updated to sumTUI 0.7.5 / sumIDE 0.2.5 / sumX 0.2.6 so bounded interactive fields inherit the common logical-end editing policy rather than rejecting keystrokes at maximum length.

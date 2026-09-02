@@ -8,9 +8,12 @@ import argparse;
 import sys;
 from pathlib import Path;
 
+from sumui import add_backend_arguments, backend_from_args;
+
 from . import __version__;
 from .console import SumBasicConsoleApp;
 from .interpreter import BasicError, BasicInterpreter;
+from .graphics import GraphicsBackendError, SumGuiGraphicsHandler;
 from .shell import run_interactive_shell;
 from .terminal_input import TerminalInput;
 
@@ -25,14 +28,24 @@ def _plain_repl(interpreter):
         except Exception as exc: print("Error: {}".format(exc), file=sys.stderr);
 
 
-def _edit_file(path=None):
+def _edit_file(path=None, backend="tui"):
     from sumide.app import main_basic;
     argv = [] if path is None else [str(path)];
+    if backend == "gui":
+        argv.insert(0, "--gui");
     return int(main_basic(argv) or 0);
 
 
 def _finish_audio(interpreter):
     interpreter.audio.wait_for_background();
+    return None;
+
+
+def _finish_graphics(interpreter, wait=False):
+    handler = getattr(getattr(interpreter, "graphics", None), "handler", None);
+    finish = getattr(handler, "finish", None);
+    if finish is not None:
+        finish(wait=bool(wait));
     return None;
 
 
@@ -45,11 +58,13 @@ def _run_loaded(interpreter, interactive_terminal=False):
                 interpreter.shell_interactive_func = lambda: terminal.run_external(run_interactive_shell);
                 interpreter.run();
                 _finish_audio(interpreter);
+            _finish_graphics(interpreter, wait=True);
             return 0;
         interpreter.run();
         _finish_audio(interpreter);
+        _finish_graphics(interpreter, wait=False);
         return 0;
-    except BasicError as exc:
+    except (BasicError, GraphicsBackendError) as exc:
         print("sumBASIC error: {}".format(exc), file=sys.stderr);
         return 1;
 
@@ -71,7 +86,8 @@ def build_parser():
     parser.add_argument("-c", "--command", dest="command", help="execute BASIC source supplied directly on the command line");
     parser.add_argument("--run", action="store_true", help="run a BASIC program");
     parser.add_argument("--check", action="store_true", help="validate program structure and recognized statements without running it");
-    parser.add_argument("--plain", action="store_true", help="use the plain terminal REPL instead of sumTUI");
+    parser.add_argument("--plain", action="store_true", help="use the plain terminal REPL instead of the Sum UI");
+    add_backend_arguments(parser);
     parser.add_argument("--version", action="store_true", help="show version");
     return parser;
 
@@ -79,14 +95,17 @@ def build_parser():
 def main(argv=None):
     parser = build_parser();
     args = parser.parse_args(argv);
+    ui_backend = backend_from_args(args);
+    if args.plain and ui_backend == "gui":
+        parser.error("--plain and --gui are mutually exclusive");
     if args.version:
         print("sumBASIC {}".format(__version__)); return 0;
     if args.file and args.command is not None:
         parser.error("a source file and --command/-c cannot be used together");
-    if args.file and not (args.run or args.check): return _edit_file(args.file);
-    if not args.file and args.command is None and not args.run and not args.check and not args.plain and bool(getattr(sys.stdin, "isatty", lambda: False)()):
-        return _edit_file(None);
-    interpreter = BasicInterpreter();
+    if args.file and not (args.run or args.check): return _edit_file(args.file, backend=ui_backend);
+    if not args.file and args.command is None and not args.run and not args.check and not args.plain and (ui_backend == "gui" or bool(getattr(sys.stdin, "isatty", lambda: False)())):
+        return _edit_file(None, backend=ui_backend);
+    interpreter = BasicInterpreter(graphics_handler=SumGuiGraphicsHandler());
     if args.command is not None:
         interpreter.program.load_text(str(args.command) + ("" if str(args.command).endswith("\n") else "\n"));
         if args.check: return _check_loaded(interpreter, "command");
@@ -103,4 +122,4 @@ def main(argv=None):
             if args.check: return _check_loaded(interpreter, "stdin");
             return _run_loaded(interpreter, interactive_terminal=False);
     if args.plain: return _plain_repl(interpreter);
-    return int(SumBasicConsoleApp(interpreter=interpreter).run() or 0);
+    return int(SumBasicConsoleApp(interpreter=interpreter).run(backend=ui_backend) or 0);

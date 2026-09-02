@@ -396,24 +396,28 @@ shows `? ` followed by the cursor. The cursor itself belongs to the active front
 
 ## Graphics vocabulary
 
-The Spectrum-inspired graphics vocabulary is now reserved even though the shared Sum Machine graphics backend is not ready yet. Statements such as:
+The first shared graphical backend is active through the language-neutral `sumUI` graphics contract and the Pygame `sumGUI` renderer. Install the graphical extra when Pygame/sumGUI is not already present:
+
+```bash
+pip install 'sumbasic[graphics]'
+```
+
+`SCREEN 1` selects the ZX Spectrum-compatible 256x192 logical profile; `SCREEN width,height` selects an arbitrary modern logical resolution; `SCREEN 0` closes the graphics window and returns to text mode. For example:
 
 ```basic
 SCREEN 1
+PAPER 0
+INK 6
+BORDER 1
 CIRCLE 100, 100, 40
 RECTANGLE 20, 20, 180, 120
 PLOT 10, 10
+LINE (10, 150)-(220, 30)
 ```
 
-are recognized and currently print, for example:
+The BASIC interpreter emits backend-neutral `GraphicsMode` and `GraphicsCommand` values; sumGUI owns the Pygame window and physical-display fitting. This keeps the language semantics independent of the eventual TUI/GUI/device renderer. `INK`, `PAPER`, `BORDER`, `BRIGHT`, `FLASH`, `INVERSE` and `OVER` are accepted by the current renderer.
 
-```text
-CIRCLE: NOT IMPLEMENTED YET
-```
-
-rather than being rejected as unknown syntax.
-
-The reserved family includes `SCREEN`, `PLOT`, `DRAW`, `LINE`, `CIRCLE`, `INK`, `PAPER`, `FLASH`, `BRIGHT`, `INVERSE`, `OVER`, `BORDER`, `UDG`, `DISPLAY`, `SHOW`, `RECTANGLE`, `POLYGON`, `ELLIPSE` and the existing screen-buffer commands. `POINT`, `SCREEN$` and `ATTR` are registered as graphical function stubs.
+The wider reserved family still includes future operations such as `DRAW`, `UDG`, `DISPLAY`, `SHOW`, `POLYGON`, `ELLIPSE` and screen-buffer commands. `POINT`, `SCREEN$` and `ATTR` remain graphical function stubs until their pixel/attribute semantics are implemented.
 
 ## File channels
 
@@ -500,5 +504,16 @@ The sumBASIC IDE remembers Code, Output and Command window position, size and ma
 The canonical BASIC reference is `src/sumbasic/help.md`, rather than a collection of help strings embedded in Python. SumDoc generates `help.helpdb`, which is shipped as the runtime cache, while `sumbasic.helpdb` remains the compatibility provider for sumIDE and other consumers. The common sumIDE language-help browser provides scrollbars, F2 Topic Map navigation, search, and direct example copying.
 
 After editing `help.md`, regenerate the runtime database with SumDoc's `markdown2helpdb`; `helpdb2markdown` provides the reverse conversion.
+
+## One BASIC application, selectable presentation
+
+```bash
+sumbasic program.bas
+sumbasic --gui program.bas
+sumbasic
+sumbasic --gui
+```
+
+Graphical mode presents the same sumBASIC/sumIDE application rather than launching a second BASIC IDE. Syntax highlighting, Code/Output/Command windows, menus, help, preferences, keyboard and mouse behavior remain shared. BASIC `SCREEN` graphics are still language graphics output; `--gui` controls the application/IDE presentation.
 
 <p align=center><b>- oOo -<b></p>
