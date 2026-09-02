@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.9 - 2026-09-02
+## 0.2.10 - 2026-09-02
 - Updated coordinated dependencies so sumBASIC TUI and `--gui` modes inherit the common ZX default and the current shared application renderer.
 - No BASIC language-surface change in this release.
 

@@ -139,6 +139,7 @@ class SumBasicIDE(ScriptIDE):
         kwargs.pop("config", None);
         kwargs.pop("config_path", None);
         super().__init__(path=path, language="basic", theme=theme, **kwargs);
+        self.app.title = "sumBASIC";
         self.command_view.on_submit = self._submit_direct_command;
         if self.basic_interpreter is None:
             self.basic_interpreter = BasicInterpreter(

@@ -28,9 +28,11 @@ def _plain_repl(interpreter):
         except Exception as exc: print("Error: {}".format(exc), file=sys.stderr);
 
 
-def _edit_file(path=None, backend="tui"):
+def _edit_file(path=None, backend="tui", run=False):
     from sumide.app import main_basic;
     argv = [] if path is None else [str(path)];
+    if run:
+        argv.insert(0, "--run");
     if backend == "gui":
         argv.insert(0, "--gui");
     return int(main_basic(argv) or 0);
@@ -103,6 +105,7 @@ def main(argv=None):
     if args.file and args.command is not None:
         parser.error("a source file and --command/-c cannot be used together");
     if args.file and not (args.run or args.check): return _edit_file(args.file, backend=ui_backend);
+    if args.file and args.run and ui_backend == "gui": return _edit_file(args.file, backend="gui", run=True);
     if not args.file and args.command is None and not args.run and not args.check and not args.plain and (ui_backend == "gui" or bool(getattr(sys.stdin, "isatty", lambda: False)())):
         return _edit_file(None, backend=ui_backend);
     interpreter = BasicInterpreter(graphics_handler=SumGuiGraphicsHandler());

@@ -1156,3 +1156,25 @@ def test_graphics_handler_receives_modes_commands_and_text_mode_close():
     assert events[1].operation == "ink";
     assert events[2].operation == "plot";
     assert events[3].operation == "close";
+
+
+def test_gui_run_routes_through_common_ide_backend(monkeypatch, tmp_path):
+    import sumbasic.cli as cli;
+    source = tmp_path / "demo.bas";
+    source.write_text('PRINT "hello"\n', encoding="utf-8");
+    observed = {};
+    def fake_edit(path=None, backend="tui", run=False):
+        observed.update(path=str(path), backend=backend, run=run);
+        return 0;
+    monkeypatch.setattr(cli, "_edit_file", fake_edit);
+    assert cli.main(["--gui", "--run", str(source)]) == 0;
+    assert observed == {"path": str(source), "backend": "gui", "run": True};
+
+
+def test_retro_lines_graphics_example_checks_cleanly():
+    from pathlib import Path;
+    from sumbasic.interpreter import BasicInterpreter;
+    path = Path(__file__).resolve().parents[1] / "examples" / "retro_lines.bas";
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+    basic.program.load_file(path);
+    basic.check();
