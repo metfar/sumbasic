@@ -228,9 +228,20 @@ def test_collection_methods():
     assert out == 'Linus\n';
 
 
-def test_graphics_are_reserved_stubs():
-    basic, out = runner('SCREEN 1\nCIRCLE 100, 100, 20\nRECTANGLE 1, 1, 10, 10\n');
-    assert out == 'SCREEN: NOT IMPLEMENTED YET\nCIRCLE: NOT IMPLEMENTED YET\nRECTANGLE: NOT IMPLEMENTED YET\n';
+def test_graphics_lower_to_backend_neutral_commands():
+    basic, out = runner('SCREEN 800, 600\nPLOT 10, 20, 14\nCIRCLE 100, 100, 20\nRECTANGLE 1, 1, 10, 10\nLINE (0,0)-(50,40), 12\n');
+    assert out == '';
+    program = basic.graphics.program();
+    assert program.mode.size == (800, 600);
+    assert [item.operation for item in program.commands] == ["plot", "circle", "rectangle", "line"];
+    assert program.commands[0].options[0][0] == "color";
+
+
+def test_spectrum_screen_is_a_compatibility_profile():
+    basic, out = runner('SCREEN "SPECTRUM"\nPLOT 128, 96\n');
+    assert out == '';
+    assert basic.graphics.mode.profile == "spectrum";
+    assert basic.graphics.mode.size == (256, 192);
 
 
 def test_bare_inkey_function():

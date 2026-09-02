@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.5
+Version: 0.2.6
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,10 +10,13 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumtui>=0.7.5
-Requires-Dist: sumide>=0.2.5
-Requires-Dist: sumx>=0.2.6
+Requires-Dist: sumui>=0.1.0a2
+Requires-Dist: sumtui>=0.8.0a2
+Requires-Dist: sumide>=0.2.7
+Requires-Dist: sumx>=0.2.9
 Requires-Dist: rich>=13.0
+Provides-Extra: graphics
+Requires-Dist: sumgui>=0.2.0a2; extra == "graphics"
 Dynamic: license-file
 
 # sumBASIC 0.2.1

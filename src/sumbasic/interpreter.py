@@ -27,6 +27,7 @@ from pathlib import Path;
 from .audio import AudioEngine, GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, MusicParseError, gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency;
 from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
+from .graphics import GraphicsRuntime;
 from .expressions import ExpressionEvaluator;
 from .program import BasicProgram;
 from .shell import ShellExecutionError, run_interactive_shell, run_shell_command;
@@ -50,7 +51,7 @@ class _BasicStop(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None):
         self.program = BasicProgram();
         self.variables = {};
         self.variable_types = {};
@@ -66,6 +67,7 @@ class BasicInterpreter:
         self.shell_output_func = shell_output_func;
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
         self.audio = AudioEngine(tone_func=tone_func, sleep_func=self.sleep_func);
+        self.graphics = GraphicsRuntime(handler=graphics_handler);
         self.tone_player = self.audio.sound_player;
         self.tone_func = tone_func if tone_func is not None else self.audio.sound;
         self.expr = ExpressionEvaluator(self.variables, self.variable_types, self.arrays, extra_functions={
@@ -92,6 +94,7 @@ class BasicInterpreter:
         self.stop_requested = threading.Event();
         self.stopped_by_request = False;
         self.stopped_by_statement = False;
+        self.graphics.reset();
         self._resume_context = None;
 
     def reset_runtime(self):
@@ -108,6 +111,7 @@ class BasicInterpreter:
         self.option_base = 0;
         self._resume_context = None;
         self.stopped_by_statement = False;
+        self.graphics.reset();
 
     def _db(self):
         if self.database is None: self.database = BasicDatabase(max_areas=10);
@@ -655,7 +659,10 @@ class BasicInterpreter:
             self._stop_if_requested();
             return pc + 1;
         if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return pc + 1;
-        if upper == "CLS": self._emit("\033[2J\033[H", end=""); return pc + 1;
+        if upper == "CLS":
+            self._emit("\033[2J\033[H", end="");
+            if self.graphics.mode is not None: self.graphics.clear();
+            return pc + 1;
         match = re.match(r"^OPTION\s+BASE\s+([01])$", text, re.I);
         if match: self.option_base = int(match.group(1)); return pc + 1;
         match = re.match(r"^DIM\s+(SHARED\s+)?(.+)$", text, re.I);
@@ -951,6 +958,8 @@ class BasicInterpreter:
                 self._assign_target(target, self.expr.eval(assignment.group(2))); return pc + 1;
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*[$%&!]?\s*\.", text):
             self.expr.eval(text); return pc + 1;
+        if self._execute_graphics_statement(text):
+            return pc + 1;
         command = self._graphics_stub_name(text);
         if command is not None:
             self._emit("{}: NOT IMPLEMENTED YET".format(command)); return pc + 1;
@@ -963,6 +972,71 @@ class BasicInterpreter:
             self._assign_target(names[0], value); return;
         if not isinstance(value, (tuple, list)) or len(value) < len(names): raise BasicError("FOR EACH value cannot be unpacked");
         for name, item in zip(names, value): self._assign_target(name, item);
+
+    def _graphics_value_list(self, body):
+        parts = self._split_top_level(str(body or ""), separators=",", keep_empty=False);
+        return [self.expr.eval(part) for part in parts];
+
+    def _execute_graphics_statement(self, text):
+        raw = str(text).strip();
+        match = re.match(r"^SCREEN\s+(.+)$", raw, re.I);
+        if match:
+            body = match.group(1).strip();
+            if body.upper() in ('"SPECTRUM"', "'SPECTRUM'", "SPECTRUM"):
+                self.graphics.spectrum();
+                return True;
+            values = self._graphics_value_list(body);
+            if len(values) == 2:
+                self.graphics.modern(int(values[0]), int(values[1]));
+                return True;
+            # Preserve unknown historical numeric modes as a neutral command.
+            self.graphics.emit("screen", tuple(values));
+            return True;
+        match = re.match(r"^PLOT\s+(.+)$", raw, re.I);
+        if match:
+            values = self._graphics_value_list(match.group(1));
+            if len(values) < 2 or len(values) > 3:
+                raise BasicError("PLOT requires x, y [, color]");
+            options = {} if len(values) < 3 else {"color": values[2]};
+            self.graphics.emit("plot", (values[0], values[1]), **options);
+            return True;
+        match = re.match(r"^CIRCLE\s+(.+)$", raw, re.I);
+        if match:
+            values = self._graphics_value_list(match.group(1));
+            if len(values) < 3 or len(values) > 4:
+                raise BasicError("CIRCLE requires x, y, radius [, color]");
+            options = {} if len(values) < 4 else {"color": values[3]};
+            self.graphics.emit("circle", (values[0], values[1], values[2]), **options);
+            return True;
+        match = re.match(r"^RECTANGLE\s+(.+)$", raw, re.I);
+        if match:
+            values = self._graphics_value_list(match.group(1));
+            if len(values) < 4 or len(values) > 5:
+                raise BasicError("RECTANGLE requires x, y, width, height [, color]");
+            options = {} if len(values) < 5 else {"color": values[4]};
+            self.graphics.emit("rectangle", tuple(values[:4]), **options);
+            return True;
+        match = re.match(r"^LINE\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*-\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)(?:\s*,\s*(.+))?$", raw, re.I);
+        if match:
+            x1, y1, x2, y2 = [self.expr.eval(match.group(index)) for index in range(1, 5)];
+            options = {};
+            if match.group(5):
+                options["color"] = self.expr.eval(match.group(5));
+            self.graphics.emit("line", (x1, y1, x2, y2), **options);
+            return True;
+        match = re.match(r"^LINE\s+(.+)$", raw, re.I);
+        if match:
+            values = self._graphics_value_list(match.group(1));
+            if len(values) < 4 or len(values) > 5:
+                return False;
+            options = {} if len(values) < 5 else {"color": values[4]};
+            self.graphics.emit("line", tuple(values[:4]), **options);
+            return True;
+        match = re.match(r"^(INK|PAPER|BORDER|BRIGHT|FLASH|INVERSE|OVER)\s+(.+)$", raw, re.I);
+        if match:
+            self.graphics.emit(match.group(1).lower(), (self.expr.eval(match.group(2)),));
+            return True;
+        return False;
 
     def _graphics_stub_name(self, text):
         upper = str(text).strip().upper();
