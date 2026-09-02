@@ -1178,3 +1178,68 @@ def test_retro_lines_graphics_example_checks_cleanly():
     basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
     basic.program.load_file(path);
     basic.check();
+
+
+def test_graphics_color_paint_get_put_and_image_bsave(tmp_path):
+    from sumui import GraphicsCommand, GraphicsMode, ImageSpec;
+    seen = [];
+    def handler(item):
+        seen.append(item);
+        if isinstance(item, GraphicsCommand) and item.operation == "capture":
+            unused_x, unused_y, width, height = item.arguments;
+            return ImageSpec(int(width), int(height), b"\x00" * (int(width) * int(height) * 4));
+        if isinstance(item, GraphicsCommand) and item.operation == "save_image":
+            return item.arguments[0];
+        return item;
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=handler);
+    target = tmp_path / "part.png";
+    basic.execute_direct('SCREEN 320,240');
+    basic.execute_direct('COLOR 14,0,1');
+    basic.execute_direct('PAINT (5,6),3,7');
+    basic.execute_direct('Tile = GET(10,20,30,40)');
+    basic.execute_direct('PUT (50,60), GET(1,2,3,4)');
+    basic.execute_direct('BSAVE "{}", GET (0,0)-(10,10)'.format(target));
+    commands = [item for item in seen if isinstance(item, GraphicsCommand)];
+    assert [item.operation for item in commands if item.operation in ("color", "paint", "put", "save_image")] == ["color", "paint", "put", "save_image"];
+    assert basic.variables["tile"].size == (30, 40);
+    captures = [item for item in commands if item.operation == "capture"];
+    assert captures[-1].arguments == (0, 0, 11, 11);
+
+
+def test_bsave_bload_classic_binary_memory(tmp_path):
+    path = tmp_path / "memory.bin";
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+    basic.execute_direct('POKE 100,65');
+    basic.execute_direct('POKE 101,66');
+    basic.execute_direct('BSAVE "{}",100,2'.format(path));
+    assert path.read_bytes() == b"AB";
+    basic.execute_direct('POKE 100,0');
+    basic.execute_direct('POKE 101,0');
+    basic.execute_direct('BLOAD "{}",100'.format(path));
+    assert basic.expr.eval('PEEK(100)') == 65;
+    assert basic.expr.eval('PEEK(101)') == 66;
+
+
+def test_chart_and_table_lower_to_shared_graphics_contracts():
+    from sumui import ChartSpec, GraphicsCommand, TableSpec;
+    seen = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=lambda item: seen.append(item) or item);
+    basic.execute_direct('SCREEN 640,480');
+    basic.execute_direct('CHART "RADAR",10,10,200,150,["A","B","C"],[1,2,3],"R","Users"');
+    basic.execute_direct('TABLE 10,200,220,120,["OS","Users"],[["Android",500],["Linux",800]],"Data"');
+    commands = [item for item in seen if isinstance(item, GraphicsCommand)];
+    chart = next(item for item in commands if item.operation == "chart");
+    table = next(item for item in commands if item.operation == "table");
+    assert isinstance(chart.arguments[4], ChartSpec) and chart.arguments[4].kind == "radar";
+    assert isinstance(table.arguments[4], TableSpec) and table.arguments[4].headers == ("OS", "Users");
+
+
+def test_graphical_examples_cover_images_charts_and_tables():
+    root = Path(__file__).resolve().parents[1] / "examples";
+    image_demo = (root / "graphics_image_ops.bas").read_text(encoding="utf-8");
+    report_demo = (root / "charts_tables.bas").read_text(encoding="utf-8");
+    assert 'PUT (50,50), GET(150,150,10,10)' in image_demo;
+    assert 'BSAVE "graphics_full.png", SCREEN' in image_demo;
+    assert 'CHART "RADAR"' in report_demo;
+    assert 'CHART "HBAR"' in report_demo;
+    assert 'TABLE ' in report_demo;

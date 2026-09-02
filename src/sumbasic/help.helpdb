@@ -330,6 +330,158 @@
         "SQRT"
       ],
       "language": "basic"
+    },
+    {
+      "name": "COLOR",
+      "category": "Graphics and images",
+      "summary": "Sets BASIC foreground, background and optional border colors.",
+      "syntax": [
+        "COLOR foreground [, background [, border]]"
+      ],
+      "example": "SCREEN 640,480\nCOLOR 14,0,1\nLINE (0,0)-(639,479)",
+      "notes": [
+        "Colors 0-15 use the GW-BASIC/QBASIC-compatible palette in BASIC graphics modes."
+      ],
+      "see_also": [
+        "INK",
+        "PAPER",
+        "BORDER"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "PAINT",
+      "category": "Graphics and images",
+      "summary": "Flood-fills an enclosed graphical area.",
+      "syntax": [
+        "PAINT (x,y) [, color [, border]]",
+        "FILL (x,y) [, color [, border]]"
+      ],
+      "example": "SCREEN 320,240\nRECTANGLE 20,20,100,80,14\nPAINT (30,30),1,14",
+      "notes": [],
+      "see_also": [
+        "COLOR",
+        "RECTANGLE"
+      ],
+      "aliases": [
+        "FILL"
+      ],
+      "language": "basic"
+    },
+    {
+      "name": "GET",
+      "category": "Graphics and images",
+      "summary": "Captures a graphical region as a portable image value.",
+      "syntax": [
+        "image = GET(x,y,width,height)",
+        "GET (x1,y1)-(x2,y2)"
+      ],
+      "example": "Tile = GET(10,10,64,64)\nPUT (100,100), Tile\nPUT (50,50), GET(150,150,10,10)",
+      "notes": [
+        "The corner form is inclusive. GET snapshots the source before PUT, so overlapping copies are safe."
+      ],
+      "see_also": [
+        "PUT",
+        "BSAVE",
+        "BLOAD"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "PUT",
+      "category": "Graphics and images",
+      "summary": "Draws an image or direct GET capture onto the graphics screen.",
+      "syntax": [
+        "PUT (x,y), image",
+        "PUT (x,y), GET(source_x,source_y,width,height)"
+      ],
+      "example": "PUT (50,50), GET(150,150,10,10)",
+      "notes": [],
+      "see_also": [
+        "GET",
+        "BSAVE",
+        "BLOAD"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "BSAVE",
+      "category": "Graphics and images",
+      "summary": "Saves classic binary memory ranges or graphical images.",
+      "syntax": [
+        "BSAVE filename, address, length",
+        "BSAVE filename, SCREEN",
+        "BSAVE filename, image",
+        "BSAVE filename, GET(x,y,width,height)",
+        "BSAVE filename, GET (x1,y1)-(x2,y2)"
+      ],
+      "example": "BSAVE \"screen.png\", SCREEN\nBSAVE \"part.png\", GET(0,0,100,100)",
+      "notes": [
+        "PNG is the preferred portable image format."
+      ],
+      "see_also": [
+        "BLOAD",
+        "GET",
+        "PUT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "BLOAD",
+      "category": "Graphics and images",
+      "summary": "Loads classic binary memory or a graphical image.",
+      "syntax": [
+        "BLOAD filename, address",
+        "BLOAD filename, image_variable",
+        "BLOAD filename, SCREEN [, x, y]"
+      ],
+      "example": "BLOAD \"sprite.png\", sprite\nPUT (100,80), sprite",
+      "notes": [],
+      "see_also": [
+        "BSAVE",
+        "GET",
+        "PUT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "CHART",
+      "category": "Graphics and images",
+      "summary": "Draws a shared Sum chart on the current graphics surface.",
+      "syntax": [
+        "CHART kind,x,y,width,height,categories,values [,title [,series_name]]"
+      ],
+      "example": "C=[\"Android\",\"Linux\",\"Windows\"]\nV=[500,800,600]\nCHART \"RADAR\",20,20,300,240,C,V,\"Users\",\"Users\"",
+      "notes": [
+        "Kinds: BAR, HBAR, LINE, SCATTER, PIE, RADAR."
+      ],
+      "see_also": [
+        "TABLE",
+        "BSAVE"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "TABLE",
+      "category": "Graphics and images",
+      "summary": "Draws a formatted table with headers and an optional title.",
+      "syntax": [
+        "TABLE x,y,width,height,headers,rows [,title]"
+      ],
+      "example": "TABLE 20,20,300,160,[\"OS\",\"Users\"],[[\"Android\",500],[\"Linux\",800]],\"Usage\"",
+      "notes": [],
+      "see_also": [
+        "CHART",
+        "BSAVE"
+      ],
+      "aliases": [],
+      "language": "basic"
     }
   ]
 }

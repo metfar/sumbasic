@@ -516,4 +516,21 @@ sumbasic --gui
 
 Graphical mode presents the same sumBASIC/sumIDE application rather than launching a second BASIC IDE. Syntax highlighting, Code/Output/Command windows, menus, help, preferences, keyboard and mouse behavior remain shared. BASIC `SCREEN` graphics are still language graphics output; `--gui` controls the application/IDE presentation.
 
+
+
+## Graphics, images, charts and tables
+
+The graphics language remains backend-neutral and is rendered by SumGUI/Pygame when a graphical backend is active. `SCREEN width,height` uses a BASIC 16-color profile while `SCREEN 1` retains the ZX compatibility profile.
+
+```basic
+SCREEN 640,480
+COLOR 14,0,0
+RECTANGLE 20,20,100,80,15
+PAINT (30,30),1,15
+PUT (50,50), GET(150,150,10,10)
+BSAVE "screen.png", SCREEN
+```
+
+`GET` produces a portable image value, `PUT` consumes one, and `BSAVE`/`BLOAD` support both their classic binary-memory forms and graphical image forms. `CHART` supports BAR, HBAR, LINE, SCATTER, PIE and RADAR; `TABLE` draws formatted rows with headers. See `examples/graphics_image_ops.bas` and `examples/charts_tables.bas`.
+
 <p align=center><b>- oOo -<b></p>

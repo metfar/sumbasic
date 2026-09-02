@@ -27,12 +27,13 @@ from pathlib import Path;
 from .audio import AudioEngine, GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, MusicParseError, gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency;
 from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
-from .graphics import GraphicsRuntime;
+from .graphics import GraphicsBackendError, GraphicsRuntime;
 from .expressions import ExpressionEvaluator;
 from .program import BasicProgram;
 from .shell import ShellExecutionError, run_interactive_shell, run_shell_command;
 from .types import BasicArray, base_type, coerce_value, default_value, normalize_type, suffix_type;
 from .vocabulary import GRAPHICS_FUNCTION_STUBS, GRAPHICS_STUBS;
+from sumui import ChartSeries, ChartSpec, ImageSpec, TableSpec;
 
 
 class BasicError(RuntimeError):
@@ -68,6 +69,7 @@ class BasicInterpreter:
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
         self.audio = AudioEngine(tone_func=tone_func, sleep_func=self.sleep_func);
         self.graphics = GraphicsRuntime(handler=graphics_handler);
+        self.memory = bytearray(65536);
         self.tone_player = self.audio.sound_player;
         self.tone_func = tone_func if tone_func is not None else self.audio.sound;
         self.expr = ExpressionEvaluator(self.variables, self.variable_types, self.arrays, extra_functions={
@@ -78,10 +80,11 @@ class BasicInterpreter:
             "DBRECNO": lambda: self._db().recno(),
             "DBRECCOUNT": lambda: self._db().reccount(),
             "INKEY$": lambda: self.inkey_func(),
-            "POINT": lambda *args: self._stub_function("POINT", 0),
+            "POINT": lambda *args: self._graphics_point(*args),
             "SCREEN$": lambda *args: self._stub_function("SCREEN$", ""),
             "ATTR": lambda *args: self._stub_function("ATTR", 0),
-            "PEEK": lambda *args: 0,
+            "GET": lambda *args: self._graphics_get(*args),
+            "PEEK": lambda address: self.memory[int(address) & 0xffff],
             "IN": lambda *args: 0,
             "USR": lambda *args: 0,
         }, now_func=now_func);
@@ -973,12 +976,118 @@ class BasicInterpreter:
         if not isinstance(value, (tuple, list)) or len(value) < len(names): raise BasicError("FOR EACH value cannot be unpacked");
         for name, item in zip(names, value): self._assign_target(name, item);
 
+    def _graphics_get(self, *args):
+        if len(args) != 4:
+            raise BasicError("GET(x,y,width,height) requires four arguments");
+        try:
+            return self.graphics.capture(int(args[0]), int(args[1]), int(args[2]), int(args[3]));
+        except GraphicsBackendError as exc:
+            raise BasicError(str(exc)) from exc;
+
+    def _graphics_point(self, *args):
+        if len(args) != 2:
+            return 0;
+        try:
+            image = self.graphics.capture(int(args[0]), int(args[1]), 1, 1);
+        except GraphicsBackendError:
+            return 0;
+        if not image.pixels:
+            return 0;
+        red, green, blue = image.pixels[0], image.pixels[1], image.pixels[2];
+        return (red << 16) | (green << 8) | blue;
+
+    def _graphics_get_expression(self, source):
+        text = str(source).strip();
+        corner = re.fullmatch(r"GET\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*-\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)", text, re.I);
+        if corner:
+            x1, y1, x2, y2 = [int(self.expr.eval(corner.group(index))) for index in range(1, 5)];
+            left = min(x1, x2); top = min(y1, y2);
+            return self.graphics.capture(left, top, abs(x2 - x1) + 1, abs(y2 - y1) + 1);
+        return self.expr.eval(text);
+
+    def _binary_bsave(self, filename, address, length):
+        address = int(address) & 0xffff; length = max(0, int(length));
+        end = min(len(self.memory), address + length);
+        Path(str(filename)).write_bytes(bytes(self.memory[address:end]));
+        return str(filename);
+
+    def _binary_bload(self, filename, address):
+        address = int(address) & 0xffff;
+        payload = Path(str(filename)).read_bytes();
+        end = min(len(self.memory), address + len(payload));
+        self.memory[address:end] = payload[:max(0, end - address)];
+        return end - address;
+
     def _graphics_value_list(self, body):
         parts = self._split_top_level(str(body or ""), separators=",", keep_empty=False);
         return [self.expr.eval(part) for part in parts];
 
     def _execute_graphics_statement(self, text):
         raw = str(text).strip();
+        match = re.match(r"^POKE\s+(.+?)\s*,\s*(.+)$", raw, re.I);
+        if match:
+            address = int(self.expr.eval(match.group(1))) & 0xffff;
+            self.memory[address] = int(self.expr.eval(match.group(2))) & 0xff;
+            return True;
+        match = re.match(r"^BSAVE\s+(.+?)\s*,\s*(.+)$", raw, re.I);
+        if match:
+            filename = str(self.expr.eval(match.group(1)));
+            source = match.group(2).strip();
+            parts = self._split_top_level(source, separators=",", keep_empty=False);
+            if len(parts) == 2 and not source.upper().startswith("GET"):
+                try:
+                    address = self.expr.eval(parts[0]); length = self.expr.eval(parts[1]);
+                    if isinstance(address, (int, float)) and isinstance(length, (int, float)):
+                        self._binary_bsave(filename, address, length);
+                        return True;
+                except Exception:
+                    pass;
+            try:
+                if source.upper() == "SCREEN":
+                    self.graphics.save_image(filename);
+                else:
+                    image = self._graphics_get_expression(source);
+                    if not isinstance(image, ImageSpec):
+                        raise BasicError("BSAVE image source must be SCREEN, GET(...), or an image variable");
+                    self.graphics.save_image(filename, image);
+            except GraphicsBackendError as exc:
+                raise BasicError(str(exc)) from exc;
+            return True;
+        match = re.match(r"^BLOAD\s+(.+?)\s*,\s*(.+)$", raw, re.I);
+        if match:
+            filename = str(self.expr.eval(match.group(1)));
+            target = match.group(2).strip();
+            parts = self._split_top_level(target, separators=",", keep_empty=False);
+            if parts and parts[0].strip().upper() == "SCREEN":
+                try:
+                    image = self.graphics.load_image(filename);
+                except GraphicsBackendError as exc:
+                    raise BasicError(str(exc)) from exc;
+                x = self.expr.eval(parts[1]) if len(parts) > 1 else 0;
+                y = self.expr.eval(parts[2]) if len(parts) > 2 else 0;
+                self.graphics.emit("put", (x, y, image));
+                return True;
+            if len(parts) == 1 and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*[$%&!?]?", parts[0].strip()):
+                try:
+                    image = self.graphics.load_image(filename);
+                except GraphicsBackendError as exc:
+                    raise BasicError(str(exc)) from exc;
+                self._assign_target(parts[0].strip(), image);
+                return True;
+            if len(parts) == 1:
+                address = self.expr.eval(parts[0]);
+                if isinstance(address, (int, float)):
+                    self._binary_bload(filename, address);
+                    return True;
+            raise BasicError("BLOAD target must be an address, SCREEN [,x,y], or an image variable");
+        match = re.match(r"^PUT\s*\(\s*(.+?)\s*,\s*(.+?)\s*\)\s*,\s*(.+)$", raw, re.I);
+        if match:
+            x = self.expr.eval(match.group(1)); y = self.expr.eval(match.group(2));
+            image = self._graphics_get_expression(match.group(3));
+            if not isinstance(image, ImageSpec):
+                raise BasicError("PUT requires an image or GET(...) expression");
+            self.graphics.emit("put", (x, y, image));
+            return True;
         match = re.match(r"^SCREEN\s+(.+)$", raw, re.I);
         if match:
             body = match.group(1).strip();
@@ -1037,6 +1146,63 @@ class BasicInterpreter:
                 return False;
             options = {} if len(values) < 5 else {"color": values[4]};
             self.graphics.emit("line", tuple(values[:4]), **options);
+            return True;
+        match = re.match(r"^COLOR(?:\s+(.+))?$", raw, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1) or "", separators=",", keep_empty=True);
+            values = [None if not part.strip() else self.expr.eval(part) for part in parts];
+            if len(values) > 3:
+                raise BasicError("COLOR accepts foreground [, background [, border]]");
+            while len(values) < 3:
+                values.append(None);
+            self.graphics.emit("color", tuple(values));
+            return True;
+        match = re.match(r"^(PAINT|FILL)\s*(?:\(\s*(.+?)\s*,\s*(.+?)\s*\)|(.+?)\s*,\s*(.+?))(?:\s*,\s*(.+?))?(?:\s*,\s*(.+))?$", raw, re.I);
+        if match:
+            x_source = match.group(2) if match.group(2) is not None else match.group(4);
+            y_source = match.group(3) if match.group(3) is not None else match.group(5);
+            x = self.expr.eval(x_source); y = self.expr.eval(y_source);
+            color = self.expr.eval(match.group(6)) if match.group(6) else None;
+            border = self.expr.eval(match.group(7)) if match.group(7) else None;
+            options = {};
+            if color is not None: options["color"] = color;
+            if border is not None: options["border"] = border;
+            self.graphics.emit("paint", (x, y), **options);
+            return True;
+        match = re.match(r"^CHART\s+(.+)$", raw, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(parts) < 7:
+                raise BasicError('CHART requires kind,x,y,width,height,categories,values [,title]');
+            kind = str(self.expr.eval(parts[0])).strip().lower();
+            x, y, width, height = [self.expr.eval(part) for part in parts[1:5]];
+            categories = self.expr.eval(parts[5]); values = self.expr.eval(parts[6]);
+            title = str(self.expr.eval(parts[7])) if len(parts) > 7 else "";
+            name = str(self.expr.eval(parts[8])) if len(parts) > 8 else "";
+            if kind in ("hbar", "horizontal", "horizontal_bar"):
+                spec = ChartSpec("bar", title=title, categories=tuple(categories), series=(ChartSeries(name=name, values=tuple(values)),), options=(("orientation", "horizontal"),));
+            elif kind == "radar":
+                spec = ChartSpec.radar(categories, values, title=title, name=name);
+            elif kind == "pie":
+                spec = ChartSpec.pie(categories, values, title=title, name=name);
+            elif kind in ("line", "scatter"):
+                constructor = ChartSpec.line if kind == "line" else ChartSpec.scatter;
+                points = tuple((index, value) for index, value in enumerate(values));
+                spec = constructor(points, title=title, name=name);
+                spec = ChartSpec(spec.kind, title=spec.title, categories=tuple(categories), series=spec.series, x_axis=spec.x_axis, y_axis=spec.y_axis, legend=spec.legend, stacked=spec.stacked, options=spec.options);
+            else:
+                spec = ChartSpec.bar(categories, values, title=title, name=name);
+            self.graphics.emit("chart", (x, y, width, height, spec));
+            return True;
+        match = re.match(r"^TABLE\s+(.+)$", raw, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(parts) < 6:
+                raise BasicError('TABLE requires x,y,width,height,headers,rows [,title]');
+            x, y, width, height = [self.expr.eval(part) for part in parts[:4]];
+            headers = self.expr.eval(parts[4]); rows = self.expr.eval(parts[5]);
+            title = str(self.expr.eval(parts[6])) if len(parts) > 6 else "";
+            self.graphics.emit("table", (x, y, width, height, TableSpec(tuple(tuple(row) for row in rows), tuple(headers), title)));
             return True;
         match = re.match(r"^(INK|PAPER|BORDER|BRIGHT|FLASH|INVERSE|OVER)\s+(.+)$", raw, re.I);
         if match:

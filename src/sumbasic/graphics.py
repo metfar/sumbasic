@@ -10,7 +10,7 @@
 #  (at your option) any later version.
 #  
 
-from sumui import GraphicsCommand, GraphicsMode, GraphicsProgram, modern_mode, spectrum_mode;
+from sumui import GraphicsCommand, GraphicsMode, GraphicsProgram, ImageSpec, basic_mode, modern_mode, spectrum_mode;
 
 
 class GraphicsRuntime:
@@ -53,7 +53,7 @@ class GraphicsRuntime:
         return mode;
 
     def modern(self, width, height, scaling="fit"):
-        return self.set_mode(modern_mode(int(width), int(height), scaling=scaling));
+        return self.set_mode(basic_mode(int(width), int(height), scaling=scaling));
 
     def spectrum(self):
         return self.set_mode(spectrum_mode());
@@ -70,6 +70,31 @@ class GraphicsRuntime:
         if self.handler is not None:
             self.handler(command);
         return command;
+
+    def query(self, operation, arguments=(), **options):
+        self.ensure_mode();
+        if self.handler is None:
+            raise GraphicsBackendError("graphics query requires an active graphical backend");
+        command = GraphicsCommand(operation, tuple(arguments or ()), tuple(options.items()));
+        return self.handler(command);
+
+    def capture(self, x=0, y=0, width=None, height=None):
+        mode = self.ensure_mode();
+        width = mode.logical_width - int(x) if width is None else int(width);
+        height = mode.logical_height - int(y) if height is None else int(height);
+        image = self.query("capture", (int(x), int(y), width, height));
+        if not isinstance(image, ImageSpec):
+            raise GraphicsBackendError("graphics backend did not return a portable image");
+        return image;
+
+    def save_image(self, filename, image=None):
+        return self.query("save_image", (str(filename),) if image is None else (str(filename), image));
+
+    def load_image(self, filename):
+        image = self.query("load_image", (str(filename),));
+        if not isinstance(image, ImageSpec):
+            raise GraphicsBackendError("graphics backend did not return a portable image");
+        return image;
 
     def clear(self, color=None):
         options = {} if color is None else {"color": color};

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.10
+Version: 0.2.11
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,13 +10,13 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumui>=0.1.0a6
-Requires-Dist: sumtui>=0.8.0a7
-Requires-Dist: sumide>=0.2.12
-Requires-Dist: sumx>=0.2.12
+Requires-Dist: sumui>=0.1.0a7
+Requires-Dist: sumtui>=0.8.0a8
+Requires-Dist: sumide>=0.2.13
+Requires-Dist: sumx>=0.2.13
 Requires-Dist: rich>=13.0
 Provides-Extra: graphics
-Requires-Dist: sumgui>=0.2.0a8; extra == "graphics"
+Requires-Dist: sumgui>=0.2.0a9; extra == "graphics"
 Dynamic: license-file
 
 # sumBASIC 0.2.1
@@ -536,5 +536,22 @@ sumbasic --gui
 ```
 
 Graphical mode presents the same sumBASIC/sumIDE application rather than launching a second BASIC IDE. Syntax highlighting, Code/Output/Command windows, menus, help, preferences, keyboard and mouse behavior remain shared. BASIC `SCREEN` graphics are still language graphics output; `--gui` controls the application/IDE presentation.
+
+
+
+## Graphics, images, charts and tables
+
+The graphics language remains backend-neutral and is rendered by SumGUI/Pygame when a graphical backend is active. `SCREEN width,height` uses a BASIC 16-color profile while `SCREEN 1` retains the ZX compatibility profile.
+
+```basic
+SCREEN 640,480
+COLOR 14,0,0
+RECTANGLE 20,20,100,80,15
+PAINT (30,30),1,15
+PUT (50,50), GET(150,150,10,10)
+BSAVE "screen.png", SCREEN
+```
+
+`GET` produces a portable image value, `PUT` consumes one, and `BSAVE`/`BLOAD` support both their classic binary-memory forms and graphical image forms. `CHART` supports BAR, HBAR, LINE, SCATTER, PIE and RADAR; `TABLE` draws formatted rows with headers. See `examples/graphics_image_ops.bas` and `examples/charts_tables.bas`.
 
 <p align=center><b>- oOo -<b></p>

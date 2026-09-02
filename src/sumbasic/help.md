@@ -470,3 +470,195 @@ PRINT GCD(84, 30)
 #### Aliases
 
 SQR, SQRT
+
+## Graphics and images
+
+### COLOR
+
+Sets the BASIC foreground, background and optional border colors. Numeric colors 0-15 use the GW-BASIC/QBASIC-compatible 16-color palette on arbitrary BASIC graphics modes.
+
+#### Syntax
+
+```text
+COLOR foreground [, background [, border]]
+```
+
+#### Functional example
+
+```basic
+SCREEN 640,480
+COLOR 14,0,1
+LINE (0,0)-(639,479)
+```
+
+#### See also
+
+INK, PAPER, BORDER
+
+### PAINT
+
+Flood-fills an enclosed area. `FILL` is an alias.
+
+#### Syntax
+
+```text
+PAINT (x,y) [, color [, border]]
+FILL (x,y) [, color [, border]]
+```
+
+#### Functional example
+
+```basic
+SCREEN 320,240
+COLOR 15,0
+RECTANGLE 20,20,100,80,14
+PAINT (30,30),1,14
+```
+
+#### See also
+
+COLOR, RECTANGLE
+
+#### Aliases
+
+FILL
+
+### GET
+
+Captures a graphical region as a portable image value.
+
+#### Syntax
+
+```text
+image = GET(x,y,width,height)
+GET (x1,y1)-(x2,y2)
+```
+
+#### Functional example
+
+```basic
+Tile = GET(10,10,64,64)
+PUT (100,100), Tile
+PUT (50,50), GET(150,150,10,10)
+```
+
+#### See also
+
+PUT, BSAVE, BLOAD
+
+### PUT
+
+Draws an image value or a direct `GET(...)` capture at a destination coordinate.
+
+#### Syntax
+
+```text
+PUT (x,y), image
+PUT (x,y), GET(source_x,source_y,width,height)
+```
+
+#### Functional example
+
+```basic
+SCREEN 320,240
+PUT (50,50), GET(150,150,10,10)
+```
+
+#### See also
+
+GET, BSAVE, BLOAD
+
+### BSAVE
+
+Preserves classic memory-range binary saving and also saves portable graphical images. The image format is inferred from the filename extension; PNG is the preferred format.
+
+#### Syntax
+
+```text
+BSAVE filename, address, length
+BSAVE filename, SCREEN
+BSAVE filename, image
+BSAVE filename, GET(x,y,width,height)
+BSAVE filename, GET (x1,y1)-(x2,y2)
+```
+
+#### Functional example
+
+```basic
+SCREEN 640,480
+LINE (0,0)-(639,479),14
+BSAVE "screen.png", SCREEN
+BSAVE "part.png", GET(0,0,100,100)
+```
+
+#### See also
+
+BLOAD, GET, PUT
+
+### BLOAD
+
+Preserves classic binary loading and can load an image into a variable or directly onto the graphics screen.
+
+#### Syntax
+
+```text
+BLOAD filename, address
+BLOAD filename, image_variable
+BLOAD filename, SCREEN [, x, y]
+```
+
+#### Functional example
+
+```basic
+BLOAD "sprite.png", sprite
+PUT (100,80), sprite
+```
+
+#### See also
+
+BSAVE, GET, PUT
+
+### CHART
+
+Draws a chart into the current graphics surface using the backend-neutral Sum chart model. Supported kinds are BAR, HBAR, LINE, SCATTER, PIE and RADAR.
+
+#### Syntax
+
+```text
+CHART kind,x,y,width,height,categories,values [,title [,series_name]]
+```
+
+#### Functional example
+
+```basic
+SCREEN 640,480
+C = ["Android","Linux","Windows"]
+V = [500,800,600]
+CHART "BAR",20,20,280,200,C,V,"Users","Users"
+```
+
+#### See also
+
+TABLE, BSAVE
+
+### TABLE
+
+Draws a formatted table with optional title into the current graphics surface.
+
+#### Syntax
+
+```text
+TABLE x,y,width,height,headers,rows [,title]
+```
+
+#### Functional example
+
+```basic
+SCREEN 640,480
+TABLE 20,20,300,160,["OS","Users"],[["Android",500],["Linux",800]],"Usage"
+```
+
+#### See also
+
+CHART, BSAVE
+

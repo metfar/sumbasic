@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.11 - 2026-09-02
+- Added QBASIC/GW-BASIC-style `COLOR foreground [,background [,border]]` alongside `INK`, `PAPER` and `BORDER`.
+- Added `PAINT` and `FILL` flood fill.
+- Added image-valued `GET`, `PUT`, direct `PUT (...), GET(...)`, image `BSAVE`/`BLOAD`, whole-screen and region PNG/BMP export/import while preserving classic binary `BSAVE`/`BLOAD` memory forms.
+- Added shared `CHART` (line, bar, horizontal bar, scatter, pie and radar) and `TABLE` graphics commands.
+- Added `graphics_image_ops.bas` and `charts_tables.bas`; refreshed the retro line-trail graphical demo.
+
 ## 0.2.10 - 2026-09-02
 - Updated coordinated dependencies so sumBASIC TUI and `--gui` modes inherit the common ZX default and the current shared application renderer.
 - No BASIC language-surface change in this release.
