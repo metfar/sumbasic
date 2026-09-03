@@ -151,6 +151,12 @@ class ExpressionEvaluator:
         return math.isfinite(value);
 
     @staticmethod
+    def _val_first_number(value):
+        match = re.search(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", str(value));
+        if not match: return 0;
+        text=match.group(0); number=float(text); return int(number) if number.is_integer() else number;
+
+    @staticmethod
     def _basic_string(value):
         if isinstance(value, complex):
             real = value.real;
@@ -272,7 +278,8 @@ class ExpressionEvaluator:
             "RTRIM$": lambda x: str(x).rstrip(),
             "SPACE$": lambda n: " " * int(n),
             "STR$": lambda x: self._basic_string(x),
-            "VAL": lambda x: float(str(x).strip()) if any(c in str(x) for c in ".eE") else int(str(x).strip() or "0"),
+            "VAL": lambda x: self._val_first_number(x),
+            "EVAL": lambda x: self.eval(str(x)),
             "VAL$": lambda x: str(x),
             "BIN": lambda x: format(int(x), "b"),
             "HEX$": lambda x: format(int(x), "X"),

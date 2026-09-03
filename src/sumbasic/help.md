@@ -879,3 +879,19 @@ PRINT AT 8,9; "PRINT AT"
 #### See also
 
 LOCATE, PRINT
+
+
+### VAL / EVAL (r20)
+
+`VAL(text)` returns the first numeric literal found in `text`; it does not evaluate arithmetic. `EVAL(text)` evaluates the BASIC expression in the current variable environment.
+
+```basic
+a=VAL("2+2")
+PRINT a
+b=EVAL("a+2")
+PRINT b
+```
+
+### RDS (r20)
+
+`READRDS(path)` and `SAVERDS(path,value)` are adapters to the common `sumData` RDS layer.

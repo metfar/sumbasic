@@ -34,6 +34,7 @@ from .shell import ShellExecutionError, run_interactive_shell, run_shell_command
 from .types import BasicArray, base_type, coerce_value, default_value, normalize_type, suffix_type;
 from .vocabulary import GRAPHICS_FUNCTION_STUBS, GRAPHICS_STUBS;
 from sumui import ChartSeries, ChartSpec, FontSpec, ImageSpec, TableSpec;
+from sumdata import read_rds, save_rds;
 
 
 class BasicError(RuntimeError):
@@ -88,6 +89,8 @@ class BasicInterpreter:
             "PEEK": lambda address: self.memory[int(address) & 0xffff],
             "IN": lambda *args: 0,
             "USR": lambda *args: 0,
+            "READRDS": lambda path: read_rds(path),
+            "SAVERDS": lambda path, value: save_rds(path, value),
         }, now_func=now_func);
         self.gosub_stack = [];
         self.for_stack = [];
@@ -1138,7 +1141,8 @@ class BasicInterpreter:
         if not values:
             raise BasicError("CHART Y requires at least one value");
         title = str(self.expr.eval(clauses["TITLE"])) if clauses.get("TITLE") else "";
-        name = str(self.expr.eval(clauses["SERIES"])) if clauses.get("SERIES") else "";
+        series_names = self._chart_sequence(clauses["SERIES"]) if clauses.get("SERIES") else ();
+        name = str(series_names[0]) if series_names else "";
         font_size = int(self.expr.eval(clauses["FONT SIZE"])) if clauses.get("FONT SIZE") else 0;
         title_size = int(self.expr.eval(clauses["TITLE FONT SIZE"])) if clauses.get("TITLE FONT SIZE") else 0;
         renderer_source = clauses.get("RENDERER") or clauses.get("BACKEND") or "";
@@ -1157,7 +1161,18 @@ class BasicInterpreter:
             options.append(("orientation", "horizontal"));
         base_font = FontSpec(size=font_size);
         heading_font = FontSpec(size=title_size, bold=True);
-        if kind == "radar":
+        stacked = False;
+        if kind in ("stacked bar", "stacked_bar", "stackedbar"):
+            kind = "bar"; stacked = True;
+        if kind in ("bar3d", "3dbar", "bar_3d"):
+            seqs = tuple(values) if values and isinstance(values[0], (list, tuple)) else (values,);
+            series = tuple(ChartSeries(name=str(series_names[i]) if i < len(series_names) else "", values=tuple(seq)) for i, seq in enumerate(seqs));
+            spec = ChartSpec("bar3d", title=title, categories=tuple(str(item) for item in categories), series=series, stacked=stacked or len(series)>1);
+        elif stacked:
+            seqs = tuple(values) if values and isinstance(values[0], (list, tuple)) else (values,);
+            series = tuple(ChartSeries(name=str(series_names[i]) if i < len(series_names) else "", values=tuple(seq)) for i, seq in enumerate(seqs));
+            spec = ChartSpec("bar", title=title, categories=tuple(str(item) for item in categories), series=series, stacked=True);
+        elif kind == "radar":
             spec = ChartSpec.radar(categories, values, title=title, name=name);
         elif kind == "pie":
             spec = ChartSpec.pie(categories, values, title=title, name=name);

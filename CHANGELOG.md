@@ -1,3 +1,7 @@
+# r20 coordinated release
+
+- Aligned with SUM r20 architecture and package versions.
+
 ## 0.2.14
 
 - `PAUSE n` now uses seconds; `PAUSE 0` waits indefinitely, and graphical waits can be interrupted by keyboard, mouse or touch while the display remains live.
