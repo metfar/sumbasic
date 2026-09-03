@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.11
+Version: 0.2.12
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,13 +10,13 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumui>=0.1.0a7
-Requires-Dist: sumtui>=0.8.0a8
-Requires-Dist: sumide>=0.2.13
-Requires-Dist: sumx>=0.2.13
+Requires-Dist: sumui>=0.1.0a8
+Requires-Dist: sumtui>=0.8.0a9
+Requires-Dist: sumide>=0.2.14
+Requires-Dist: sumx>=0.2.14
 Requires-Dist: rich>=13.0
 Provides-Extra: graphics
-Requires-Dist: sumgui>=0.2.0a9; extra == "graphics"
+Requires-Dist: sumgui>=0.2.0a10; extra == "graphics"
 Dynamic: license-file
 
 # sumBASIC 0.2.1
@@ -553,5 +553,21 @@ BSAVE "screen.png", SCREEN
 ```
 
 `GET` produces a portable image value, `PUT` consumes one, and `BSAVE`/`BLOAD` support both their classic binary-memory forms and graphical image forms. `CHART` supports BAR, HBAR, LINE, SCATTER, PIE and RADAR; `TABLE` draws formatted rows with headers. See `examples/graphics_image_ops.bas` and `examples/charts_tables.bas`.
+
+## r17 display, pages, typography and compatibility
+
+sumBASIC now distinguishes historical `SCREEN` profiles from modern `DISPLAY` modes. `SCREEN 12` is 640x480/16-color and `SCREEN 13` is 320x200/256-color; active and visible pages are preserved. Modern displays accept arbitrary sizes, color/depth declarations, AUTO/MANUAL refresh and page counts.
+
+```basic
+DISPLAY 640,480,65536,MANUAL,2,1,0
+LINE (0,0)-(639,479),11
+DISPLAY VISIBLE 1
+DISPLAY UPDATE
+COPY SCREEN FROM 1 TO 0
+```
+
+Graphical drawing defaults to immediate presentation in AUTO mode. `FONT`, `ARC`, `ELLIPSE` and `OUTTEXTXY` extend the shared graphics vocabulary, while chart/table calls can specify body/title/header font sizes. Text cursor compatibility includes `GOTOXY X,Y`, `LOCATE Y,X` and Spectrum-style zero-based `PRINT AT Y,X; ...` over one logical console model.
+
+Examples include `bgi_style_smile.bas`, `display_pages.bas`, `console_positions.bas`, the visible image-operations demo and the compact-font chart/table dashboard.
 
 <p align=center><b>- oOo -<b></p>

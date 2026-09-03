@@ -662,3 +662,191 @@ TABLE 20,20,300,160,["OS","Users"],[["Android",500],["Linux",800]],"Usage"
 
 CHART, BSAVE
 
+
+### DISPLAY
+
+Creates a modern arbitrary-resolution graphics display. Unlike historical `SCREEN` modes, `DISPLAY` is not limited to legacy resolutions or palette sizes. `AUTO` presents each drawing command immediately; `MANUAL` keeps drawing off-screen until `DISPLAY UPDATE`.
+
+#### Syntax
+
+```text
+DISPLAY width,height,colors_or_bits,AUTO|MANUAL [,pages [,active_page [,visible_page]]]
+DISPLAY ACTIVE page
+DISPLAY VISIBLE page
+DISPLAY UPDATE
+```
+
+Use a `BIT` suffix to specify bit depth explicitly, for example `24BIT` or `32BIT`. A numeric value such as `65536` means number of colors.
+
+#### Functional example
+
+```basic
+DISPLAY 640,480,65536,MANUAL,2,1,0
+LINE (0,0)-(639,479),11
+DISPLAY VISIBLE 1
+DISPLAY UPDATE
+```
+
+#### See also
+
+SCREEN, COPY, FONT
+
+### SCREEN
+
+Selects a historical BASIC graphics profile or text mode. `SCREEN 12` is 640x480 with 16 colors and `SCREEN 13` is 320x200 with 256 colors. Active and visible pages are preserved as separate concepts.
+
+#### Syntax
+
+```text
+SCREEN 0
+SCREEN 12 [,colorswitch [,active_page [,visible_page]]]
+SCREEN 13 [,colorswitch [,active_page [,visible_page]]]
+SCREEN "SPECTRUM"
+```
+
+#### Functional example
+
+```basic
+SCREEN 12,,1,0
+LINE (10,10)-(200,100),11
+```
+
+#### See also
+
+DISPLAY, COPY
+
+### COPY SCREEN
+
+Copies a complete graphics page to another page.
+
+#### Syntax
+
+```text
+COPY SCREEN FROM source_page TO destination_page
+COPY SCREEN source_page TO destination_page
+```
+
+#### Functional example
+
+```basic
+DISPLAY 320,240,256,MANUAL,2,1,0
+LINE (0,0)-(319,239),11
+COPY SCREEN FROM 1 TO 0
+DISPLAY VISIBLE 0
+DISPLAY UPDATE
+```
+
+#### See also
+
+DISPLAY, SCREEN
+
+### FONT
+
+Sets the default graphical font. Charts, tables and text inherit it unless they provide a more specific font size/family.
+
+#### Syntax
+
+```text
+FONT family,size [,bold [,italic [,underline]]]
+```
+
+#### Functional example
+
+```basic
+DISPLAY 640,480,65536,AUTO
+FONT "monospace",12
+OUTTEXTXY 20,20,"Sum",15
+```
+
+#### See also
+
+OUTTEXTXY, CHART, TABLE
+
+### ARC
+
+Draws a circular arc using BGI-style start/end angles in degrees.
+
+#### Syntax
+
+```text
+ARC x,y,start_angle,end_angle,radius [,color]
+```
+
+#### Functional example
+
+```basic
+DISPLAY 320,240,256,AUTO
+ARC 160,120,220,320,60,15
+```
+
+#### See also
+
+CIRCLE, ELLIPSE
+
+### ELLIPSE
+
+Draws an ellipse or elliptical arc.
+
+#### Syntax
+
+```text
+ELLIPSE x,y,start_angle,end_angle,rx,ry [,color]
+```
+
+#### Functional example
+
+```basic
+DISPLAY 320,240,256,AUTO
+ELLIPSE 160,120,0,360,80,40,11
+```
+
+#### See also
+
+ARC, CIRCLE
+
+### OUTTEXTXY
+
+Draws text at pixel coordinates on the graphics surface.
+
+#### Syntax
+
+```text
+OUTTEXTXY x,y,text [,color [,size [,font_family]]]
+```
+
+#### Functional example
+
+```basic
+DISPLAY 640,480,65536,AUTO
+OUTTEXTXY 20,20,"Hello from sumBASIC",15,14,"monospace"
+```
+
+#### See also
+
+FONT
+
+### GOTOXY
+
+Moves the text cursor using the classic `conio.h` order `X,Y`. Coordinates are one-based. `LOCATE Y,X` reaches the same logical cell. Spectrum-compatible `PRINT AT Y,X; ...` keeps the historical zero-based AT coordinates.
+
+#### Syntax
+
+```text
+GOTOXY x,y
+LOCATE y,x
+PRINT AT y,x; expression
+```
+
+#### Functional example
+
+```basic
+GOTOXY 10,5
+PRINT "GOTOXY"
+LOCATE 7,10
+PRINT "LOCATE"
+PRINT AT 8,9; "PRINT AT"
+```
+
+#### See also
+
+LOCATE, PRINT

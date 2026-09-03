@@ -533,4 +533,20 @@ BSAVE "screen.png", SCREEN
 
 `GET` produces a portable image value, `PUT` consumes one, and `BSAVE`/`BLOAD` support both their classic binary-memory forms and graphical image forms. `CHART` supports BAR, HBAR, LINE, SCATTER, PIE and RADAR; `TABLE` draws formatted rows with headers. See `examples/graphics_image_ops.bas` and `examples/charts_tables.bas`.
 
+## r17 display, pages, typography and compatibility
+
+sumBASIC now distinguishes historical `SCREEN` profiles from modern `DISPLAY` modes. `SCREEN 12` is 640x480/16-color and `SCREEN 13` is 320x200/256-color; active and visible pages are preserved. Modern displays accept arbitrary sizes, color/depth declarations, AUTO/MANUAL refresh and page counts.
+
+```basic
+DISPLAY 640,480,65536,MANUAL,2,1,0
+LINE (0,0)-(639,479),11
+DISPLAY VISIBLE 1
+DISPLAY UPDATE
+COPY SCREEN FROM 1 TO 0
+```
+
+Graphical drawing defaults to immediate presentation in AUTO mode. `FONT`, `ARC`, `ELLIPSE` and `OUTTEXTXY` extend the shared graphics vocabulary, while chart/table calls can specify body/title/header font sizes. Text cursor compatibility includes `GOTOXY X,Y`, `LOCATE Y,X` and Spectrum-style zero-based `PRINT AT Y,X; ...` over one logical console model.
+
+Examples include `bgi_style_smile.bas`, `display_pages.bas`, `console_positions.bas`, the visible image-operations demo and the compact-font chart/table dashboard.
+
 <p align=center><b>- oOo -<b></p>

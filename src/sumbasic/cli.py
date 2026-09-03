@@ -28,6 +28,24 @@ def _plain_repl(interpreter):
         except Exception as exc: print("Error: {}".format(exc), file=sys.stderr);
 
 
+
+
+def _source_uses_graphics(path):
+    """Return True when a BASIC source owns a pixel graphics display.
+
+    A GUI graphics program must not be executed inside the same Pygame display
+    that presents sumIDE: Pygame exposes one process-global display surface.
+    Standalone graphical --run therefore owns the display directly, while
+    text-only GUI programs continue to use the common IDE/application shell.
+    """;
+    try:
+        source=Path(path).read_text(encoding="utf-8",errors="replace");
+    except OSError:
+        return False;
+    import re;
+    pattern=re.compile(r"^\s*(?:DISPLAY\b|SCREEN\s+(?!0(?:\s|$))|PLOT\b|CIRCLE\b|RECTANGLE\b|ARC\b|ELLIPSE\b|PAINT\b|FILL\b|CHART\b|TABLE\b|OUTTEXTXY\b|BSAVE\s+.+,\s*SCREEN\b)",re.I|re.M);
+    return bool(pattern.search(source));
+
 def _edit_file(path=None, backend="tui", run=False):
     from sumide.app import main_basic;
     argv = [] if path is None else [str(path)];
@@ -105,7 +123,7 @@ def main(argv=None):
     if args.file and args.command is not None:
         parser.error("a source file and --command/-c cannot be used together");
     if args.file and not (args.run or args.check): return _edit_file(args.file, backend=ui_backend);
-    if args.file and args.run and ui_backend == "gui": return _edit_file(args.file, backend="gui", run=True);
+    if args.file and args.run and ui_backend == "gui" and not _source_uses_graphics(args.file): return _edit_file(args.file, backend="gui", run=True);
     if not args.file and args.command is None and not args.run and not args.check and not args.plain and (ui_backend == "gui" or bool(getattr(sys.stdin, "isatty", lambda: False)())):
         return _edit_file(None, backend=ui_backend);
     interpreter = BasicInterpreter(graphics_handler=SumGuiGraphicsHandler());

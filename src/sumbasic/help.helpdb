@@ -334,14 +334,12 @@
     {
       "name": "COLOR",
       "category": "Graphics and images",
-      "summary": "Sets BASIC foreground, background and optional border colors.",
+      "summary": "Sets the BASIC foreground, background and optional border colors. Numeric colors 0-15 use the GW-BASIC/QBASIC-compatible 16-color palette on arbitrary BASIC graphics modes.",
       "syntax": [
         "COLOR foreground [, background [, border]]"
       ],
       "example": "SCREEN 640,480\nCOLOR 14,0,1\nLINE (0,0)-(639,479)",
-      "notes": [
-        "Colors 0-15 use the GW-BASIC/QBASIC-compatible palette in BASIC graphics modes."
-      ],
+      "notes": [],
       "see_also": [
         "INK",
         "PAPER",
@@ -353,12 +351,12 @@
     {
       "name": "PAINT",
       "category": "Graphics and images",
-      "summary": "Flood-fills an enclosed graphical area.",
+      "summary": "Flood-fills an enclosed area. `FILL` is an alias.",
       "syntax": [
         "PAINT (x,y) [, color [, border]]",
         "FILL (x,y) [, color [, border]]"
       ],
-      "example": "SCREEN 320,240\nRECTANGLE 20,20,100,80,14\nPAINT (30,30),1,14",
+      "example": "SCREEN 320,240\nCOLOR 15,0\nRECTANGLE 20,20,100,80,14\nPAINT (30,30),1,14",
       "notes": [],
       "see_also": [
         "COLOR",
@@ -378,9 +376,7 @@
         "GET (x1,y1)-(x2,y2)"
       ],
       "example": "Tile = GET(10,10,64,64)\nPUT (100,100), Tile\nPUT (50,50), GET(150,150,10,10)",
-      "notes": [
-        "The corner form is inclusive. GET snapshots the source before PUT, so overlapping copies are safe."
-      ],
+      "notes": [],
       "see_also": [
         "PUT",
         "BSAVE",
@@ -392,12 +388,12 @@
     {
       "name": "PUT",
       "category": "Graphics and images",
-      "summary": "Draws an image or direct GET capture onto the graphics screen.",
+      "summary": "Draws an image value or a direct `GET(...)` capture at a destination coordinate.",
       "syntax": [
         "PUT (x,y), image",
         "PUT (x,y), GET(source_x,source_y,width,height)"
       ],
-      "example": "PUT (50,50), GET(150,150,10,10)",
+      "example": "SCREEN 320,240\nPUT (50,50), GET(150,150,10,10)",
       "notes": [],
       "see_also": [
         "GET",
@@ -410,7 +406,7 @@
     {
       "name": "BSAVE",
       "category": "Graphics and images",
-      "summary": "Saves classic binary memory ranges or graphical images.",
+      "summary": "Preserves classic memory-range binary saving and also saves portable graphical images. The image format is inferred from the filename extension; PNG is the preferred format.",
       "syntax": [
         "BSAVE filename, address, length",
         "BSAVE filename, SCREEN",
@@ -418,10 +414,8 @@
         "BSAVE filename, GET(x,y,width,height)",
         "BSAVE filename, GET (x1,y1)-(x2,y2)"
       ],
-      "example": "BSAVE \"screen.png\", SCREEN\nBSAVE \"part.png\", GET(0,0,100,100)",
-      "notes": [
-        "PNG is the preferred portable image format."
-      ],
+      "example": "SCREEN 640,480\nLINE (0,0)-(639,479),14\nBSAVE \"screen.png\", SCREEN\nBSAVE \"part.png\", GET(0,0,100,100)",
+      "notes": [],
       "see_also": [
         "BLOAD",
         "GET",
@@ -433,7 +427,7 @@
     {
       "name": "BLOAD",
       "category": "Graphics and images",
-      "summary": "Loads classic binary memory or a graphical image.",
+      "summary": "Preserves classic binary loading and can load an image into a variable or directly onto the graphics screen.",
       "syntax": [
         "BLOAD filename, address",
         "BLOAD filename, image_variable",
@@ -452,14 +446,12 @@
     {
       "name": "CHART",
       "category": "Graphics and images",
-      "summary": "Draws a shared Sum chart on the current graphics surface.",
+      "summary": "Draws a chart into the current graphics surface using the backend-neutral Sum chart model. Supported kinds are BAR, HBAR, LINE, SCATTER, PIE and RADAR.",
       "syntax": [
         "CHART kind,x,y,width,height,categories,values [,title [,series_name]]"
       ],
-      "example": "C=[\"Android\",\"Linux\",\"Windows\"]\nV=[500,800,600]\nCHART \"RADAR\",20,20,300,240,C,V,\"Users\",\"Users\"",
-      "notes": [
-        "Kinds: BAR, HBAR, LINE, SCATTER, PIE, RADAR."
-      ],
+      "example": "SCREEN 640,480\nC = [\"Android\",\"Linux\",\"Windows\"]\nV = [500,800,600]\nCHART \"BAR\",20,20,280,200,C,V,\"Users\",\"Users\"",
+      "notes": [],
       "see_also": [
         "TABLE",
         "BSAVE"
@@ -470,15 +462,153 @@
     {
       "name": "TABLE",
       "category": "Graphics and images",
-      "summary": "Draws a formatted table with headers and an optional title.",
+      "summary": "Draws a formatted table with optional title into the current graphics surface.",
       "syntax": [
         "TABLE x,y,width,height,headers,rows [,title]"
       ],
-      "example": "TABLE 20,20,300,160,[\"OS\",\"Users\"],[[\"Android\",500],[\"Linux\",800]],\"Usage\"",
+      "example": "SCREEN 640,480\nTABLE 20,20,300,160,[\"OS\",\"Users\"],[[\"Android\",500],[\"Linux\",800]],\"Usage\"",
       "notes": [],
       "see_also": [
         "CHART",
         "BSAVE"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "DISPLAY",
+      "category": "Graphics and images",
+      "summary": "Creates a modern arbitrary-resolution graphics display. Unlike historical `SCREEN` modes, `DISPLAY` is not limited to legacy resolutions or palette sizes. `AUTO` presents each drawing command immediately; `MANUAL` keeps drawing off-screen until `DISPLAY UPDATE`.",
+      "syntax": [
+        "DISPLAY width,height,colors_or_bits,AUTO|MANUAL [,pages [,active_page [,visible_page]]]",
+        "DISPLAY ACTIVE page",
+        "DISPLAY VISIBLE page",
+        "DISPLAY UPDATE"
+      ],
+      "example": "DISPLAY 640,480,65536,MANUAL,2,1,0\nLINE (0,0)-(639,479),11\nDISPLAY VISIBLE 1\nDISPLAY UPDATE",
+      "notes": [],
+      "see_also": [
+        "SCREEN",
+        "COPY",
+        "FONT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "SCREEN",
+      "category": "Graphics and images",
+      "summary": "Selects a historical BASIC graphics profile or text mode. `SCREEN 12` is 640x480 with 16 colors and `SCREEN 13` is 320x200 with 256 colors. Active and visible pages are preserved as separate concepts.",
+      "syntax": [
+        "SCREEN 0",
+        "SCREEN 12 [,colorswitch [,active_page [,visible_page]]]",
+        "SCREEN 13 [,colorswitch [,active_page [,visible_page]]]",
+        "SCREEN \"SPECTRUM\""
+      ],
+      "example": "SCREEN 12,,1,0\nLINE (10,10)-(200,100),11",
+      "notes": [],
+      "see_also": [
+        "DISPLAY",
+        "COPY"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "COPY SCREEN",
+      "category": "Graphics and images",
+      "summary": "Copies a complete graphics page to another page.",
+      "syntax": [
+        "COPY SCREEN FROM source_page TO destination_page",
+        "COPY SCREEN source_page TO destination_page"
+      ],
+      "example": "DISPLAY 320,240,256,MANUAL,2,1,0\nLINE (0,0)-(319,239),11\nCOPY SCREEN FROM 1 TO 0\nDISPLAY VISIBLE 0\nDISPLAY UPDATE",
+      "notes": [],
+      "see_also": [
+        "DISPLAY",
+        "SCREEN"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "FONT",
+      "category": "Graphics and images",
+      "summary": "Sets the default graphical font. Charts, tables and text inherit it unless they provide a more specific font size/family.",
+      "syntax": [
+        "FONT family,size [,bold [,italic [,underline]]]"
+      ],
+      "example": "DISPLAY 640,480,65536,AUTO\nFONT \"monospace\",12\nOUTTEXTXY 20,20,\"Sum\",15",
+      "notes": [],
+      "see_also": [
+        "OUTTEXTXY",
+        "CHART",
+        "TABLE"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "ARC",
+      "category": "Graphics and images",
+      "summary": "Draws a circular arc using BGI-style start/end angles in degrees.",
+      "syntax": [
+        "ARC x,y,start_angle,end_angle,radius [,color]"
+      ],
+      "example": "DISPLAY 320,240,256,AUTO\nARC 160,120,220,320,60,15",
+      "notes": [],
+      "see_also": [
+        "CIRCLE",
+        "ELLIPSE"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "ELLIPSE",
+      "category": "Graphics and images",
+      "summary": "Draws an ellipse or elliptical arc.",
+      "syntax": [
+        "ELLIPSE x,y,start_angle,end_angle,rx,ry [,color]"
+      ],
+      "example": "DISPLAY 320,240,256,AUTO\nELLIPSE 160,120,0,360,80,40,11",
+      "notes": [],
+      "see_also": [
+        "ARC",
+        "CIRCLE"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "OUTTEXTXY",
+      "category": "Graphics and images",
+      "summary": "Draws text at pixel coordinates on the graphics surface.",
+      "syntax": [
+        "OUTTEXTXY x,y,text [,color [,size [,font_family]]]"
+      ],
+      "example": "DISPLAY 640,480,65536,AUTO\nOUTTEXTXY 20,20,\"Hello from sumBASIC\",15,14,\"monospace\"",
+      "notes": [],
+      "see_also": [
+        "FONT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "GOTOXY",
+      "category": "Graphics and images",
+      "summary": "Moves the text cursor using the classic `conio.h` order `X,Y`. Coordinates are one-based. `LOCATE Y,X` reaches the same logical cell. Spectrum-compatible `PRINT AT Y,X; ...` keeps the historical zero-based AT coordinates.",
+      "syntax": [
+        "GOTOXY x,y",
+        "LOCATE y,x",
+        "PRINT AT y,x; expression"
+      ],
+      "example": "GOTOXY 10,5\nPRINT \"GOTOXY\"\nLOCATE 7,10\nPRINT \"LOCATE\"\nPRINT AT 8,9; \"PRINT AT\"",
+      "notes": [],
+      "see_also": [
+        "LOCATE",
+        "PRINT"
       ],
       "aliases": [],
       "language": "basic"

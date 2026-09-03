@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.12 - 2026-09-02
+
+- Added historical SCREEN 12/13 page semantics and modern DISPLAY AUTO/MANUAL page buffering.
+- Added `COPY SCREEN`, `FONT`, `ARC`, `ELLIPSE`, `OUTTEXTXY`, `GOTOXY` and Spectrum-style `PRINT AT`.
+- Added per-chart/table typography overrides and r17 BGI-style/page/cursor examples.
+
 ## 0.2.11 - 2026-09-02
 - Added QBASIC/GW-BASIC-style `COLOR foreground [,background [,border]]` alongside `INK`, `PAPER` and `BORDER`.
 - Added `PAINT` and `FILL` flood fill.

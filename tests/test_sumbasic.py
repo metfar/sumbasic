@@ -1243,3 +1243,88 @@ def test_graphical_examples_cover_images_charts_and_tables():
     assert 'CHART "RADAR"' in report_demo;
     assert 'CHART "HBAR"' in report_demo;
     assert 'TABLE ' in report_demo;
+
+
+def test_qbasic_screen_12_13_and_page_options_are_preserved():
+    basic, out = runner('SCREEN 12,,1,0\n');
+    assert out == '';
+    assert basic.graphics.mode.size == (640, 480);
+    assert basic.graphics.mode.option("colors") == 16;
+    assert basic.graphics.mode.option("active_page") == 1;
+    assert basic.graphics.mode.option("visible_page") == 0;
+    basic, out = runner('SCREEN 13\n');
+    assert basic.graphics.mode.size == (320, 200);
+    assert basic.graphics.mode.option("colors") == 256;
+
+
+def test_display_manual_pages_update_and_copy_lower_to_common_commands():
+    from sumui import GraphicsCommand, GraphicsMode;
+    seen = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=lambda item: seen.append(item) or item);
+    basic.execute_direct('DISPLAY 640,480,65536,MANUAL,3,2,1');
+    basic.execute_direct('DISPLAY ACTIVE 0');
+    basic.execute_direct('COPY SCREEN FROM 0 TO 2');
+    basic.execute_direct('DISPLAY VISIBLE 2');
+    basic.execute_direct('DISPLAY UPDATE');
+    mode = next(item for item in seen if isinstance(item, GraphicsMode));
+    assert mode.option("refresh") == "manual";
+    assert mode.option("pages") == 3;
+    assert mode.option("bits_per_pixel") == 16;
+    ops = [item.operation for item in seen if isinstance(item, GraphicsCommand)];
+    assert ops[-4:] == ["active_page", "copy_page", "visible_page", "update"];
+
+
+def test_gotoxy_locate_and_spectrum_print_at_share_cursor_output_model():
+    output = [];
+    basic = BasicInterpreter(output_func=lambda text, end="\n": output.append(str(text) + end));
+    basic.program.load_text('GOTOXY 10,5\nPRINT "A"\nLOCATE 7,10\nPRINT "B"\nPRINT AT 8,9; "C"\n');
+    basic.run();
+    rendered = ''.join(output);
+    assert '\x1b[5;10H' in rendered;
+    assert '\x1b[7;10H' in rendered;
+    assert '\x1b[9;10H' in rendered;
+    assert 'A\n' in rendered and 'B\n' in rendered and 'C\n' in rendered;
+
+
+def test_font_arc_ellipse_and_outtext_lower_to_graphics_commands():
+    from sumui import GraphicsCommand;
+    seen = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=lambda item: seen.append(item) or item);
+    basic.execute_direct('DISPLAY 640,480,65536,AUTO');
+    basic.execute_direct('FONT "monospace",12');
+    basic.execute_direct('ARC 100,100,0,180,40,11');
+    basic.execute_direct('ELLIPSE 200,100,0,360,60,30,13');
+    basic.execute_direct('OUTTEXTXY 20,20,"Casa",15,10,"monospace"');
+    ops = [item.operation for item in seen if isinstance(item, GraphicsCommand)];
+    assert [op for op in ops if op in ("setfont", "arc", "ellipse", "text")] == ["setfont", "arc", "ellipse", "text"];
+
+
+def test_chart_and_table_accept_per_render_font_sizes():
+    from sumui import GraphicsCommand;
+    seen = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=lambda item: seen.append(item) or item);
+    basic.execute_direct('DISPLAY 640,480,65536,AUTO');
+    basic.execute_direct('CHART "BAR",10,10,200,150,["A","B"],[1,2],"T","V",9,11,"monospace"');
+    basic.execute_direct('TABLE 10,200,220,120,["N","V"],[["A",1]],"Data",9,11,9,"monospace"');
+    chart = next(item.arguments[4] for item in seen if isinstance(item, GraphicsCommand) and item.operation == "chart");
+    table = next(item.arguments[4] for item in seen if isinstance(item, GraphicsCommand) and item.operation == "table");
+    assert chart.font.size == 9 and chart.title_font.size == 11;
+    assert table.font.size == 9 and table.title_font.size == 11 and table.header_font.size == 9;
+
+
+def test_r17_graphical_and_cursor_examples_check_cleanly():
+    root = Path(__file__).resolve().parents[1] / "examples";
+    for name in ("bgi_style_smile.bas", "console_positions.bas", "display_pages.bas", "graphics_image_ops.bas", "charts_tables.bas"):
+        basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+        basic.program.load_file(root / name);
+        basic.check();
+
+
+def test_gui_run_detects_graphics_sources_for_standalone_display(tmp_path):
+    from sumbasic.cli import _source_uses_graphics;
+    graphics = tmp_path / "g.bas";
+    graphics.write_text('DISPLAY 640,480,65536,AUTO\nLINE (0,0)-(10,10),11\n', encoding="utf-8");
+    text = tmp_path / "t.bas";
+    text.write_text('CLS\nPRINT "hello"\n', encoding="utf-8");
+    assert _source_uses_graphics(graphics) is True;
+    assert _source_uses_graphics(text) is False;

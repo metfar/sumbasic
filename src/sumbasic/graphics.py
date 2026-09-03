@@ -10,7 +10,7 @@
 #  (at your option) any later version.
 #  
 
-from sumui import GraphicsCommand, GraphicsMode, GraphicsProgram, ImageSpec, basic_mode, modern_mode, spectrum_mode;
+from sumui import GraphicsCommand, GraphicsMode, GraphicsProgram, ImageSpec, basic_mode, display_mode, modern_mode, screen_mode, spectrum_mode;
 
 
 class GraphicsRuntime:
@@ -53,7 +53,28 @@ class GraphicsRuntime:
         return mode;
 
     def modern(self, width, height, scaling="fit"):
-        return self.set_mode(basic_mode(int(width), int(height), scaling=scaling));
+        return self.set_mode(basic_mode(int(width), int(height), scaling=scaling, refresh="auto", pages=1, active_page=0, visible_page=0));
+
+    def historical_screen(self, number, colorswitch=0, active_page=0, visible_page=0):
+        return self.set_mode(screen_mode(int(number), colorswitch=colorswitch, active_page=active_page, visible_page=visible_page));
+
+    def display(self, width, height, color_spec=32, refresh="auto", pages=1, active_page=0, visible_page=0):
+        return self.set_mode(display_mode(width, height, color_spec=color_spec, refresh=refresh, pages=pages, active_page=active_page, visible_page=visible_page));
+
+    def set_active_page(self, page):
+        return self.emit("active_page", (int(page),));
+
+    def set_visible_page(self, page):
+        return self.emit("visible_page", (int(page),));
+
+    def set_refresh(self, mode):
+        return self.emit("refresh_mode", (str(mode).lower(),));
+
+    def update(self):
+        return self.emit("update");
+
+    def copy_page(self, source, destination):
+        return self.emit("copy_page", (int(source), int(destination)));
 
     def spectrum(self):
         return self.set_mode(spectrum_mode());

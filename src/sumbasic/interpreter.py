@@ -33,7 +33,7 @@ from .program import BasicProgram;
 from .shell import ShellExecutionError, run_interactive_shell, run_shell_command;
 from .types import BasicArray, base_type, coerce_value, default_value, normalize_type, suffix_type;
 from .vocabulary import GRAPHICS_FUNCTION_STUBS, GRAPHICS_STUBS;
-from sumui import ChartSeries, ChartSpec, ImageSpec, TableSpec;
+from sumui import ChartSeries, ChartSpec, FontSpec, ImageSpec, TableSpec;
 
 
 class BasicError(RuntimeError):
@@ -399,7 +399,7 @@ class BasicInterpreter:
             r'^PRINT\s+#(?:[A-Ja-j]|\d+)\s*,?.*$',
             r'^DB\.SELECT\s+.+$', r'^DB\.USE(?:\s+.+?)?(?:\s+ALIAS\s+[A-Za-z_][A-Za-z0-9_]*)?$',
             r'^DB\.GO\s+.+$', r'^DB\.SKIP(?:\s+.+)?$', r'^DB\.CLOSE$',
-            r'^LOCATE\s+.+?\s*,\s*.+$',
+            r'^LOCATE\s+.+?\s*,\s*.+$', r'^GOTOXY\s+.+?\s*,\s*.+$',
             r'^(?:LINE\s+INPUT|INPUT)\s*(?:"[^"]*"\s*[;,])?\s*[A-Za-z_][A-Za-z0-9_]*[$%&!]?$',
             r'^GOTO\s+(?:[A-Za-z_][A-Za-z0-9_]*|\d+)$', r'^GOSUB\s+(?:[A-Za-z_][A-Za-z0-9_]*|\d+)$',
             r'^FOR\s+EACH\s+.+?\s+IN\s+.+$',
@@ -757,11 +757,24 @@ class BasicInterpreter:
         match = re.match(r'^DB\.SKIP(?:\s+(.+))?$', text, re.I);
         if match: self._db().skip(int(self.expr.eval(match.group(1)))) if match.group(1) else self._db().skip(1); return pc + 1;
         if upper == "DB.CLOSE": self._db().close(); self.database = None; return pc + 1;
+        match = re.match(r"^GOTOXY\s+(.+?)\s*,\s*(.+)$", text, re.I);
+        if match:
+            col = int(self.expr.eval(match.group(1))); row = int(self.expr.eval(match.group(2)));
+            self._emit("\033[{};{}H".format(max(1,row), max(1,col)), end=""); return pc + 1;
         match = re.match(r"^LOCATE\s+(.+?)\s*,\s*(.+)$", text, re.I);
         if match:
             row = int(self.expr.eval(match.group(1)));
             col = int(self.expr.eval(match.group(2)));
             self._emit("\033[{};{}H".format(row, col), end=""); return pc + 1;
+        match = re.match(r"^PRINT\s+AT\s+(.+?)\s*,\s*(.+?)\s*;\s*(.*)$", text, re.I);
+        if match:
+            row = int(self.expr.eval(match.group(1))) + 1; col = int(self.expr.eval(match.group(2))) + 1; body = match.group(3);
+            self._emit("\033[{};{}H".format(max(1,row), max(1,col)), end="");
+            items = self._split_print(body); trailing = body.rstrip().endswith((";", ",")); rendered = "";
+            for expression, separator in items:
+                if expression: rendered += self._format_value(self.expr.eval(expression));
+                if separator == ",": rendered += "\t";
+            self._emit(rendered, end="" if trailing else "\n"); return pc + 1;
         if upper.startswith("PRINT") or text.startswith("?"):
             body = text[1:].strip() if text.startswith("?") else text[5:].strip();
             if body.upper().startswith("USING "): return self._print_using(body[6:].strip(), pc);
@@ -1090,23 +1103,82 @@ class BasicInterpreter:
             return True;
         match = re.match(r"^SCREEN\s+(.+)$", raw, re.I);
         if match:
-            body = match.group(1).strip();
-            if body.upper() in ('"SPECTRUM"', "'SPECTRUM'", "SPECTRUM"):
-                self.graphics.spectrum();
-                return True;
-            values = self._graphics_value_list(body);
-            if len(values) == 1 and int(values[0]) == 1:
-                self.graphics.spectrum();
-                return True;
-            if len(values) == 1 and int(values[0]) == 0:
-                self.graphics.text_mode();
-                return True;
-            if len(values) == 2:
-                self.graphics.modern(int(values[0]), int(values[1]));
-                return True;
-            # Preserve unknown historical numeric modes as a neutral command.
-            self.graphics.emit("screen", tuple(values));
-            return True;
+            body = match.group(1).strip(); upper_body=body.upper();
+            if upper_body in ("UPDATE","REFRESH","REDRAW"):
+                self.graphics.update(); return True;
+            if upper_body in ('"SPECTRUM"', "'SPECTRUM'", "SPECTRUM"):
+                self.graphics.spectrum(); return True;
+            parts=self._split_top_level(body,separators=",",keep_empty=True);
+            first=self.expr.eval(parts[0]) if parts and parts[0].strip() else 0;
+            if len(parts)==1 and int(first)==1:
+                # Retained Sum compatibility alias; historical QBASIC modes 12/13 are exact.
+                self.graphics.spectrum(); return True;
+            if len(parts)==1 and int(first)==0:
+                self.graphics.text_mode(); return True;
+            if int(first) in (12,13):
+                colorswitch=int(self.expr.eval(parts[1])) if len(parts)>1 and parts[1].strip() else 0;
+                active=int(self.expr.eval(parts[2])) if len(parts)>2 and parts[2].strip() else 0;
+                visible=int(self.expr.eval(parts[3])) if len(parts)>3 and parts[3].strip() else 0;
+                self.graphics.historical_screen(int(first),colorswitch,active,visible); return True;
+            values=[self.expr.eval(part) for part in parts if part.strip()];
+            if len(values)==2:
+                self.graphics.modern(int(values[0]),int(values[1])); return True;
+            self.graphics.emit("screen",tuple(values)); return True;
+        match = re.match(r"^DISPLAY(?:\s+|\s*\()(.*?)(?:\))?$", raw, re.I);
+        if match:
+            body=(match.group(1) or "").strip(); upper_body=body.upper();
+            if upper_body in ("UPDATE","REFRESH","REDRAW"):
+                self.graphics.update(); return True;
+            page_match=re.match(r"^(ACTIVE|VISIBLE)\s+(.+)$",body,re.I);
+            if page_match:
+                page=int(self.expr.eval(page_match.group(2)));
+                (self.graphics.set_active_page(page) if page_match.group(1).upper()=="ACTIVE" else self.graphics.set_visible_page(page)); return True;
+            if upper_body in ("AUTO","MANUAL"):
+                self.graphics.set_refresh(upper_body.lower()); return True;
+            parts=self._split_top_level(body,separators=",",keep_empty=False);
+            if len(parts)<2: raise BasicError("DISPLAY requires width,height [,colors/bits [,AUTO|MANUAL [,pages [,active [,visible]]]]]");
+            width=int(self.expr.eval(parts[0])); height=int(self.expr.eval(parts[1]));
+            color_spec=32; refresh="auto"; pages=1; active=0; visible=0;
+            if len(parts)>2:
+                token=parts[2].strip();
+                if token.upper().endswith("BIT") and token[:-3].strip().isdigit(): color_spec=token.upper();
+                else: color_spec=self.expr.eval(token);
+            if len(parts)>3:
+                refresh=parts[3].strip().strip('"\'').lower();
+                if refresh not in ("auto","manual"): raise BasicError("DISPLAY refresh must be AUTO or MANUAL");
+            if len(parts)>4: pages=int(self.expr.eval(parts[4]));
+            if len(parts)>5: active=int(self.expr.eval(parts[5]));
+            if len(parts)>6: visible=int(self.expr.eval(parts[6]));
+            self.graphics.display(width,height,color_spec,refresh,pages,active,visible); return True;
+        match = re.match(r"^COPY\s+SCREEN(?:\s+FROM)?\s+(.+?)\s+TO\s+(.+)$",raw,re.I);
+        if match:
+            self.graphics.copy_page(int(self.expr.eval(match.group(1))),int(self.expr.eval(match.group(2)))); return True;
+        match = re.match(r"^FONT\s+(.+)$",raw,re.I);
+        if match:
+            parts=self._split_top_level(match.group(1),separators=",",keep_empty=False);
+            if not parts: raise BasicError("FONT requires family [,size [,bold [,italic [,underline]]]]");
+            family=str(self.expr.eval(parts[0])); size=int(self.expr.eval(parts[1])) if len(parts)>1 else 0;
+            bold=bool(self.expr.eval(parts[2])) if len(parts)>2 else False; italic=bool(self.expr.eval(parts[3])) if len(parts)>3 else False; underline=bool(self.expr.eval(parts[4])) if len(parts)>4 else False;
+            self.graphics.emit("setfont",(family,size),bold=bold,italic=italic,underline=underline); return True;
+        match = re.match(r"^ARC\s+(.+)$",raw,re.I);
+        if match:
+            values=self._graphics_value_list(match.group(1));
+            if len(values)<5 or len(values)>6: raise BasicError("ARC requires x,y,start,end,radius [,color]");
+            options={} if len(values)<6 else {"color":values[5]}; self.graphics.emit("arc",tuple(values[:5]),**options); return True;
+        match = re.match(r"^ELLIPSE\s+(.+)$",raw,re.I);
+        if match:
+            values=self._graphics_value_list(match.group(1));
+            if len(values)<6 or len(values)>7: raise BasicError("ELLIPSE requires x,y,start,end,rx,ry [,color]");
+            options={} if len(values)<7 else {"color":values[6]}; self.graphics.emit("ellipse",tuple(values[:6]),**options); return True;
+        match = re.match(r"^(?:OUTTEXTXY|DRAWTEXT|TEXT)\s+(.+)$",raw,re.I);
+        if match:
+            parts=self._split_top_level(match.group(1),separators=",",keep_empty=False);
+            if len(parts)<3: raise BasicError("OUTTEXTXY requires x,y,text [,color [,size [,font]]]");
+            x=self.expr.eval(parts[0]); y=self.expr.eval(parts[1]); value=str(self.expr.eval(parts[2])); options={};
+            if len(parts)>3: options["color"]=self.expr.eval(parts[3]);
+            if len(parts)>4: options["size"]=int(self.expr.eval(parts[4]));
+            if len(parts)>5: options["font_name"]=str(self.expr.eval(parts[5]));
+            self.graphics.emit("text",(x,y,value),**options); return True;
         match = re.match(r"^PLOT\s+(.+)$", raw, re.I);
         if match:
             values = self._graphics_value_list(match.group(1));
@@ -1192,6 +1264,10 @@ class BasicInterpreter:
                 spec = ChartSpec(spec.kind, title=spec.title, categories=tuple(categories), series=spec.series, x_axis=spec.x_axis, y_axis=spec.y_axis, legend=spec.legend, stacked=spec.stacked, options=spec.options);
             else:
                 spec = ChartSpec.bar(categories, values, title=title, name=name);
+            font_size=int(self.expr.eval(parts[9])) if len(parts)>9 else 0; title_size=int(self.expr.eval(parts[10])) if len(parts)>10 else 0; family=str(self.expr.eval(parts[11])) if len(parts)>11 else "";
+            if font_size or title_size or family:
+                base_font=FontSpec(family=family,size=font_size); title_font=FontSpec(family=family,size=title_size,bold=True);
+                spec=ChartSpec(spec.kind,title=spec.title,categories=spec.categories,series=spec.series,x_axis=spec.x_axis,y_axis=spec.y_axis,legend=spec.legend,stacked=spec.stacked,options=spec.options,font=base_font,title_font=title_font);
             self.graphics.emit("chart", (x, y, width, height, spec));
             return True;
         match = re.match(r"^TABLE\s+(.+)$", raw, re.I);
@@ -1202,7 +1278,9 @@ class BasicInterpreter:
             x, y, width, height = [self.expr.eval(part) for part in parts[:4]];
             headers = self.expr.eval(parts[4]); rows = self.expr.eval(parts[5]);
             title = str(self.expr.eval(parts[6])) if len(parts) > 6 else "";
-            self.graphics.emit("table", (x, y, width, height, TableSpec(tuple(tuple(row) for row in rows), tuple(headers), title)));
+            font_size=int(self.expr.eval(parts[7])) if len(parts)>7 else 0; title_size=int(self.expr.eval(parts[8])) if len(parts)>8 else 0; header_size=int(self.expr.eval(parts[9])) if len(parts)>9 else 0; family=str(self.expr.eval(parts[10])) if len(parts)>10 else "";
+            spec=TableSpec(tuple(tuple(row) for row in rows),tuple(headers),title,font=FontSpec(family=family,size=font_size),title_font=FontSpec(family=family,size=title_size,bold=True),header_font=FontSpec(family=family,size=header_size,bold=True));
+            self.graphics.emit("table", (x, y, width, height, spec));
             return True;
         match = re.match(r"^(INK|PAPER|BORDER|BRIGHT|FLASH|INVERSE|OVER)\s+(.+)$", raw, re.I);
         if match:
