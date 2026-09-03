@@ -1,3 +1,9 @@
+## 0.2.13
+
+- DISPLAY now marks its color semantics as BASIC-compatible so classic numeric colors remain visible in modern color depths.
+- PAUSE services an active graphical backend instead of blindly sleeping, keeping graphics responsive and presented during delays.
+- Coordinated with sumUI 0.1.0a9 and sumGUI 0.2.0a11 fixes for SCREEN 13, DISPLAY palettes and graphical presentation.
+
 # Changelog
 
 ## 0.2.12 - 2026-09-02

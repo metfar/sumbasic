@@ -59,7 +59,7 @@ class GraphicsRuntime:
         return self.set_mode(screen_mode(int(number), colorswitch=colorswitch, active_page=active_page, visible_page=visible_page));
 
     def display(self, width, height, color_spec=32, refresh="auto", pages=1, active_page=0, visible_page=0):
-        return self.set_mode(display_mode(width, height, color_spec=color_spec, refresh=refresh, pages=pages, active_page=active_page, visible_page=visible_page));
+        return self.set_mode(display_mode(width, height, color_spec=color_spec, refresh=refresh, pages=pages, active_page=active_page, visible_page=visible_page, palette_profile="basic"));
 
     def set_active_page(self, page):
         return self.emit("active_page", (int(page),));
@@ -121,6 +121,12 @@ class GraphicsRuntime:
         options = {} if color is None else {"color": color};
         return self.emit("clear", (), **options);
 
+    def service(self, seconds=0.0):
+        callback = getattr(self.handler, "service", None) if self.handler is not None else None;
+        if callback is None:
+            return False;
+        return bool(callback(float(seconds)));
+
     def program(self):
         mode = self.ensure_mode();
         return GraphicsProgram(mode, tuple(self.commands), background=self.background);
@@ -159,6 +165,11 @@ class SumGuiGraphicsHandler:
         if self.window is None:
             return 0;
         return self.window.finish(wait=wait);
+
+    def service(self, seconds=0.0):
+        if self.window is None:
+            return False;
+        return bool(self.window.service(float(seconds)));
 
     def close(self):
         if self.window is not None:

@@ -1328,3 +1328,21 @@ def test_gui_run_detects_graphics_sources_for_standalone_display(tmp_path):
     text.write_text('CLS\nPRINT "hello"\n', encoding="utf-8");
     assert _source_uses_graphics(graphics) is True;
     assert _source_uses_graphics(text) is False;
+
+
+def test_r18_basic_display_marks_classic_palette_semantics_for_graphical_backend():
+    basic, out = runner('DISPLAY 640,480,65536,AUTO\n');
+    assert out == '';
+    assert basic.graphics.mode.option("palette_profile") == "basic";
+
+
+def test_r18_pause_services_live_graphics_backend_instead_of_blind_sleep():
+    serviced=[]; sleeps=[];
+    class Handler:
+        def __call__(self,item): return item;
+        def service(self,seconds): serviced.append(seconds); return True;
+    basic=BasicInterpreter(output_func=lambda *args,**kwargs:None,graphics_handler=Handler(),sleep_func=lambda seconds:sleeps.append(seconds));
+    basic.program.load_text('DISPLAY 320,240,256,AUTO\nPAUSE 25\n');
+    basic.run();
+    assert serviced == [0.5];
+    assert sleeps == [];

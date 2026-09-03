@@ -913,9 +913,12 @@ class BasicInterpreter:
             if frames == 0:
                 while not self.inkey_func():
                     self._stop_if_requested();
-                    self.sleep_func(0.01);
+                    if not self.graphics.service(0.01):
+                        self.sleep_func(0.01);
             else:
-                self.sleep_func(frames / 50.0);
+                seconds = frames / 50.0;
+                if not self.graphics.service(seconds):
+                    self.sleep_func(seconds);
                 self._stop_if_requested();
             return pc + 1;
         match = re.match(r"^BEEP\s+(.+)$", text, re.I);
