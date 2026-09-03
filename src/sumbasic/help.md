@@ -471,6 +471,28 @@ PRINT GCD(84, 30)
 
 SQR, SQRT
 
+### PAUSE
+
+Waits for a number of seconds or until the user provides input. `PAUSE 0` waits indefinitely. In graphical mode, keyboard, mouse and touch presses interrupt the wait while the window continues to process redraw and resize events.
+
+#### Syntax
+
+```text
+PAUSE seconds
+```
+
+#### Functional example
+
+```basic
+PRINT "Press a key/click/touch, or wait one second"
+PAUSE 1
+PRINT "Continuing"
+```
+
+#### See also
+
+INKEY$, DISPLAY
+
 ## Graphics and images
 
 ### COLOR
@@ -626,15 +648,22 @@ Draws a chart into the current graphics surface using the backend-neutral Sum ch
 
 ```text
 CHART kind,x,y,width,height,categories,values [,title [,series_name]]
+CHART kind TITLE title X categories Y values [AT x,y] [SIZE width,height] [FONT SIZE n] [TITLE FONT SIZE n] [RENDERER native|matplotlib|seaborn]
 ```
+
+A physical line ending in `\` or `_` continues on the next line. The named form lowers to the same backend-neutral `ChartSpec` used by Python and SumGUI. Matplotlib and Seaborn are optional renderers; the native SumGUI renderer remains the dependency-light default.
 
 #### Functional example
 
 ```basic
-SCREEN 640,480
-C = ["Android","Linux","Windows"]
-V = [500,800,600]
-CHART "BAR",20,20,280,200,C,V,"Users","Users"
+DISPLAY 640,480,65536,AUTO
+CHART BAR \
+    TITLE "Users by OS" \
+    X "Android","Linux","Windows" \
+    Y 500,800,600 \
+    FONT SIZE 10 \
+    RENDERER "native"
+PAUSE 0
 ```
 
 #### See also

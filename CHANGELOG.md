@@ -1,3 +1,10 @@
+## 0.2.14
+
+- `PAUSE n` now uses seconds; `PAUSE 0` waits indefinitely, and graphical waits can be interrupted by keyboard, mouse or touch while the display remains live.
+- Added modern physical-line continuation with trailing backslash or underscore.
+- Added simplified named `CHART` syntax lowering to the same shared `ChartSpec`, including optional native/Matplotlib/Seaborn renderer selection.
+- Added matching native, Matplotlib and Seaborn BASIC chart examples and regenerated the help database.
+
 ## 0.2.13
 
 - DISPLAY now marks its color semantics as BASIC-compatible so classic numeric colors remain visible in modern color depths.

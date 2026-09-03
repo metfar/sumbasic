@@ -108,12 +108,37 @@ class BasicProgram:
         self.lines = rewritten;
         return mapping;
 
+    def _logical_lines(self, source):
+        """Join modern BASIC continuation lines ending in backslash or ``_``.
+
+        Continuation is resolved before numbered/free-form detection so a
+        multiline statement remains one executable statement.  The marker is
+        recognized only as the final non-space character of a physical line.
+        """;
+        logical = [];
+        pending = "";
+        for physical in str(source).splitlines():
+            text = str(physical).rstrip();
+            continued = bool(text) and text[-1:] in ("\\", "_");
+            if continued:
+                text = text[:-1].rstrip();
+            if pending:
+                pending = pending + " " + text.lstrip();
+            else:
+                pending = text;
+            if not continued:
+                logical.append(pending);
+                pending = "";
+        if pending:
+            logical.append(pending);
+        return logical;
+
     def load_text(self, source):
         self.clear();
         records = [];
         has_numbered = False;
         has_free_code = False;
-        for physical in str(source).splitlines():
+        for physical in self._logical_lines(source):
             match = re.match(r"^\s*(\d+)\s*(.*)$", physical);
             if match:
                 has_numbered = True;

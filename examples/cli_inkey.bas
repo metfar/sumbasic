@@ -3,5 +3,5 @@ PRINT "Press Q to quit"
 :LOOP
 A$ = INKEY$
 IF A$ = "Q" OR A$ = "q" OR A$ = CHR$(27) THEN END
-PAUSE 1
+PAUSE .02
 GOTO LOOP

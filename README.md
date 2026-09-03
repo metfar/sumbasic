@@ -49,7 +49,7 @@ IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
 GOTO LOOP
 ```
 
-A named label may also identify a DATA block for `RESTORE FontData`. A leading `:Name` defines a label; ordinary colons elsewhere remain statement separators, so `BEEP .1, 0: PAUSE 45` is valid.
+A named label may also identify a DATA block for `RESTORE FontData`. A leading `:Name` defines a label; ordinary colons elsewhere remain statement separators, so `BEEP .1, 0: PAUSE .9` is valid.
 
 Comments have three forms:
 
@@ -162,9 +162,9 @@ Arithmetic `+`, `-`, `*`, `/` and `^` works directly. `SIN`, `COS`, `TAN`, inver
 
 ## Clock functions and retro clock demo
 
-`TIME$` returns the local wall-clock time as `HH:MM:SS`. `TIMER` returns seconds since local midnight, including a fractional part when the host clock provides it. `PAUSE n` uses the Spectrum convention of 50 frames per second, so `PAUSE 50` waits approximately one second.
+`TIME$` returns the local wall-clock time as `HH:MM:SS`. `TIMER` returns seconds since local midnight, including a fractional part when the host clock provides it. `PAUSE n` uses seconds. `PAUSE 0` waits indefinitely; a key press interrupts terminal waits, and graphical waits are also interrupted by mouse/touch while the display continues updating. `PAUSE .001` is one millisecond.
 
-`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. It runs continuously and exits when Escape, `Q`, or `q` is pressed. Each update plays `BEEP .1, 0`; because `BEEP` is blocking and Spectrum `PAUSE` is measured at 50 ticks per second, `PAUSE 45` contributes 0.9 seconds for an approximately one-second clock cadence. The same immediate `INKEY$` exit works both inside the IDE and with `sumbasic --run examples/retro_clock.bas`; on an interactive terminal no Enter key is required.
+`examples/retro_clock.bas` loads a 5x7 digit font once from `DATA` into `DIM SHARED` multidimensional arrays, then renders `TIME$` in large block characters with `LOCATE`/`PRINT`. It runs continuously and exits when Escape, `Q`, or `q` is pressed. Each update plays `BEEP .1, 0`; because `BEEP` is blocking, `PAUSE .9` contributes another 0.9 seconds for an approximately one-second clock cadence. The same immediate `INKEY$` exit works both inside the IDE and with `sumbasic --run examples/retro_clock.bas`; on an interactive terminal no Enter key is required.
 
 ## IDE execution
 
@@ -548,5 +548,12 @@ COPY SCREEN FROM 1 TO 0
 Graphical drawing defaults to immediate presentation in AUTO mode. `FONT`, `ARC`, `ELLIPSE` and `OUTTEXTXY` extend the shared graphics vocabulary, while chart/table calls can specify body/title/header font sizes. Text cursor compatibility includes `GOTOXY X,Y`, `LOCATE Y,X` and Spectrum-style zero-based `PRINT AT Y,X; ...` over one logical console model.
 
 Examples include `bgi_style_smile.bas`, `display_pages.bas`, `console_positions.bas`, the visible image-operations demo and the compact-font chart/table dashboard.
+
+<p align=center><b>- oOo -<b></p>
+
+
+## Shared chart renderers
+
+`CHART` lowers to the same `sumUI.ChartSpec` used by Python. The native SumGUI renderer is the default; Matplotlib and Seaborn are optional ChartSpec renderers (`sumbasic[charts]`). Named CHART syntax accepts `\` or `_` line continuation.
 
 <p align=center><b>- oOo -<b></p>

@@ -127,6 +127,20 @@ class GraphicsRuntime:
             return False;
         return bool(callback(float(seconds)));
 
+    def pause(self, seconds=0.0):
+        """Wait through the active graphics backend until input or timeout.
+
+        Returns ``None`` when the backend does not implement interruptible
+        pause, otherwise a boolean indicating whether user input interrupted
+        the wait. ``seconds == 0`` means wait indefinitely.
+        """;
+        if self.mode is None:
+            return None;
+        callback = getattr(self.handler, "pause", None) if self.handler is not None else None;
+        if callback is None:
+            return None;
+        return bool(callback(float(seconds)));
+
     def program(self):
         mode = self.ensure_mode();
         return GraphicsProgram(mode, tuple(self.commands), background=self.background);
@@ -170,6 +184,9 @@ class SumGuiGraphicsHandler:
         if self.window is None:
             return False;
         return bool(self.window.service(float(seconds)));
+
+    def pause(self, seconds=0.0):
+        return bool(self._ensure_window().pause(float(seconds)));
 
     def close(self):
         if self.window is not None:

@@ -441,12 +441,15 @@ def test_time_functions_work_in_program_source():
     assert ''.join(output) == '12:34:56\n45296.25\n';
 
 
-def test_pause_uses_spectrum_50hz_frames():
-    sleeps = [];
-    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, sleep_func=lambda seconds: sleeps.append(seconds));
-    basic.program.load_text('PAUSE 50\nPAUSE 25\n');
+def test_pause_uses_seconds_and_is_interruptible_through_graphics_backend():
+    waits = [];
+    class Handler:
+        def __call__(self, item): return item;
+        def pause(self, seconds): waits.append(seconds); return False;
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, graphics_handler=Handler());
+    basic.program.load_text('DISPLAY 320,240,256,AUTO\nPAUSE .001\nPAUSE 2.5\nPAUSE 0\n');
     basic.run();
-    assert sleeps == [1.0, 0.5];
+    assert waits == [0.001, 2.5, 0.0];
 
 
 def test_retro_clock_example_loads_and_uses_time_font_data():
@@ -455,7 +458,7 @@ def test_retro_clock_example_loads_and_uses_time_font_data():
     assert 'DIM SHARED Font$(9, 6), Colon$(6)' in text;
     assert 'T$ = TIME$' in text;
     assert 'TIMER' in text;
-    assert 'BEEP .1, 0: PAUSE 45' in text;
+    assert 'BEEP .1, 0: PAUSE .9' in text;
     assert ':LOOP' in text;
     assert 'A$ = INKEY$' in text;
     assert 'GOTO LOOP' in text;
@@ -659,18 +662,18 @@ def test_named_colon_label_goto_and_colon_statement_separator():
 GOTO LOOP
 A! = 99
 :LOOP
-A! = A! + 1: BEEP .1, 0: PAUSE 45
+A! = A! + 1: BEEP .1, 0: PAUSE .9
 PRINT A!
 END
 ''';
-    basic = BasicInterpreter(output_func=lambda text, end="\n": None, sleep_func=lambda seconds: sleeps.append(seconds), tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
+    basic = BasicInterpreter(output_func=lambda text, end="\n": None, inkey_func=lambda: "x", sleep_func=lambda seconds: sleeps.append(seconds), tone_func=lambda frequency, duration, blocking: tones.append((frequency, duration, blocking)));
     basic.program.load_text(source);
     result = basic.run();
     assert result['a!'] == 1;
     assert len(tones) == 1;
     assert abs(tones[0][1] - .1) < 1e-12;
     assert tones[0][2] is True;
-    assert sleeps == [.9];
+    assert sleeps == [];
 
 
 def test_named_label_restore_can_target_following_data():
@@ -706,7 +709,7 @@ def test_ide_routes_q_and_escape_to_running_program_inkey(tmp_path):
     path = tmp_path / 'inkey.bas';
     path.write_text('PRINT "saved"\n', encoding='utf-8');
     ide = SumBasicIDE(path=path);
-    ide.editor.set_text(':LOOP\nA$ = INKEY$\nIF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END\nPAUSE 1\nGOTO LOOP\n', modified=True);
+    ide.editor.set_text(':LOOP\nA$ = INKEY$\nIF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END\nPAUSE .02\nGOTO LOOP\n', modified=True);
     ide.app.running = True;
     original_text = ide.editor.text;
     ide.run_program();
@@ -718,7 +721,7 @@ def test_ide_routes_q_and_escape_to_running_program_inkey(tmp_path):
     assert not ide._run_thread.is_alive();
     assert ide.editor.text == original_text;
     ide._poll_run_state();
-    ide.editor.set_text(':LOOP\nA$ = INKEY$\nIF A$ = CHR$(27) THEN END\nPAUSE 1\nGOTO LOOP\n', modified=True);
+    ide.editor.set_text(':LOOP\nA$ = INKEY$\nIF A$ = CHR$(27) THEN END\nPAUSE .02\nGOTO LOOP\n', modified=True);
     ide.run_program();
     deadline = time.monotonic() + 1.0;
     while (ide._run_thread is None or not ide._run_thread.is_alive()) and time.monotonic() < deadline:
@@ -1336,13 +1339,44 @@ def test_r18_basic_display_marks_classic_palette_semantics_for_graphical_backend
     assert basic.graphics.mode.option("palette_profile") == "basic";
 
 
-def test_r18_pause_services_live_graphics_backend_instead_of_blind_sleep():
-    serviced=[]; sleeps=[];
+def test_r19_pause_uses_live_graphics_wait_instead_of_blind_sleep():
+    paused=[]; sleeps=[];
     class Handler:
         def __call__(self,item): return item;
-        def service(self,seconds): serviced.append(seconds); return True;
+        def pause(self,seconds): paused.append(seconds); return True;
     basic=BasicInterpreter(output_func=lambda *args,**kwargs:None,graphics_handler=Handler(),sleep_func=lambda seconds:sleeps.append(seconds));
     basic.program.load_text('DISPLAY 320,240,256,AUTO\nPAUSE 25\n');
     basic.run();
-    assert serviced == [0.5];
+    assert paused == [25.0];
     assert sleeps == [];
+
+
+def test_r19_chart_named_syntax_and_backslash_continuation_lower_to_same_chartspec():
+    from sumui import GraphicsCommand;
+    seen=[];
+    basic=BasicInterpreter(output_func=lambda *args,**kwargs:None,graphics_handler=lambda item: seen.append(item) or item);
+    basic.program.load_text('''DISPLAY 640,480,65536,AUTO
+CHART BAR \\
+    TITLE "Users by OS" \\
+    X "Android","Linux","Windows" \\
+    Y 500,800,600 \\
+    FONT SIZE 10 \\
+    RENDERER "matplotlib"
+''');
+    basic.run();
+    command=next(item for item in seen if isinstance(item,GraphicsCommand) and item.operation=="chart");
+    spec=command.arguments[4];
+    assert spec.kind=="bar";
+    assert spec.title=="Users by OS";
+    assert spec.categories==("Android","Linux","Windows");
+    assert spec.series[0].values==(500.0,800.0,600.0);
+    assert spec.font.size==10;
+    assert spec.option("renderer")=="matplotlib";
+
+def test_r19_program_joins_underscore_and_backslash_continuations():
+    from sumbasic.program import BasicProgram;
+    source = 'PRINT "A" ' + chr(92) + '\n; "B"\nPRINT "C" _\n; "D"\n';
+    program=BasicProgram().load_text(source);
+    lines=program.source_lines();
+    assert lines[0][1]=='PRINT "A" ; "B"';
+    assert lines[1][1]=='PRINT "C" ; "D"';

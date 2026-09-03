@@ -332,6 +332,22 @@
       "language": "basic"
     },
     {
+      "name": "PAUSE",
+      "category": "Functions",
+      "summary": "Waits for a number of seconds or until the user provides input. `PAUSE 0` waits indefinitely. In graphical mode, keyboard, mouse and touch presses interrupt the wait while the window continues to process redraw and resize events.",
+      "syntax": [
+        "PAUSE seconds"
+      ],
+      "example": "PRINT \"Press a key/click/touch, or wait one second\"\nPAUSE 1\nPRINT \"Continuing\"",
+      "notes": [],
+      "see_also": [
+        "INKEY$",
+        "DISPLAY"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
       "name": "COLOR",
       "category": "Graphics and images",
       "summary": "Sets the BASIC foreground, background and optional border colors. Numeric colors 0-15 use the GW-BASIC/QBASIC-compatible 16-color palette on arbitrary BASIC graphics modes.",
@@ -448,9 +464,10 @@
       "category": "Graphics and images",
       "summary": "Draws a chart into the current graphics surface using the backend-neutral Sum chart model. Supported kinds are BAR, HBAR, LINE, SCATTER, PIE and RADAR.",
       "syntax": [
-        "CHART kind,x,y,width,height,categories,values [,title [,series_name]]"
+        "CHART kind,x,y,width,height,categories,values [,title [,series_name]]",
+        "CHART kind TITLE title X categories Y values [AT x,y] [SIZE width,height] [FONT SIZE n] [TITLE FONT SIZE n] [RENDERER native|matplotlib|seaborn]"
       ],
-      "example": "SCREEN 640,480\nC = [\"Android\",\"Linux\",\"Windows\"]\nV = [500,800,600]\nCHART \"BAR\",20,20,280,200,C,V,\"Users\",\"Users\"",
+      "example": "DISPLAY 640,480,65536,AUTO\nCHART BAR \\\n    TITLE \"Users by OS\" \\\n    X \"Android\",\"Linux\",\"Windows\" \\\n    Y 500,800,600 \\\n    FONT SIZE 10 \\\n    RENDERER \"native\"\nPAUSE 0",
       "notes": [],
       "see_also": [
         "TABLE",

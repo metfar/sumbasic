@@ -14,7 +14,7 @@ PLAY BACKGROUND "T200O5N3cdefgC"
 BEEP .08, 12
 SOUND 660, 3
 PRINT "BASIC keeps running while PLAY and SOUND continue"
-PAUSE 35
+PAUSE .7
 PLAY OFF
 
 PRINT "GW-BASIC Music Macro Language"
@@ -23,7 +23,7 @@ GWPLAY "MF T180 O4 L8 C D E F G A B > C"
 PRINT "GWPLAY background"
 GWPLAY "MB T200 O4 L8 C E G > C"
 PRINT "queued"
-PAUSE 30
+PAUSE .6
 GWPLAY OFF
 
 END

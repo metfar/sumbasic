@@ -40,7 +40,7 @@ PRINT "TIME$ = "; T$; "   TIMER = "; INT(TIMER)
 
 # BEEP blocks for .1 s. PAUSE uses Spectrum 50 Hz ticks, so 45 ticks
 # contribute another .9 s: approximately one update/beep per second.
-BEEP .1, 0: PAUSE 45
+BEEP .1, 0: PAUSE .9
 A$ = INKEY$: IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
 GOTO LOOP
 

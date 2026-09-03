@@ -63,6 +63,7 @@ class BasicInterpreter:
         self.input_func = input_func;
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
+        self._inkey_buffer = [];
         self.shell_command_func = shell_command_func;
         self.shell_interactive_func = shell_interactive_func;
         self.shell_output_func = shell_output_func;
@@ -79,7 +80,7 @@ class BasicInterpreter:
             "FREEFILE": lambda: self.channels.freefile(),
             "DBRECNO": lambda: self._db().recno(),
             "DBRECCOUNT": lambda: self._db().reccount(),
-            "INKEY$": lambda: self.inkey_func(),
+            "INKEY$": lambda: self._read_inkey(),
             "POINT": lambda *args: self._graphics_point(*args),
             "SCREEN$": lambda *args: self._stub_function("SCREEN$", ""),
             "ATTR": lambda *args: self._stub_function("ATTR", 0),
@@ -333,6 +334,16 @@ class BasicInterpreter:
         self.data = data;
         self.data_line_index = lines;
         self.data_index = 0;
+
+    def _read_inkey(self):
+        if self._inkey_buffer:
+            return self._inkey_buffer.pop(0);
+        return self.inkey_func();
+
+    def _preserve_inkey(self, value):
+        if value:
+            self._inkey_buffer.append(value);
+        return value;
 
     def request_stop(self):
         """Request cooperative termination of the currently running BASIC program."""
@@ -908,18 +919,25 @@ class BasicInterpreter:
             self.expr.random.seed(seed); return pc + 1;
         match = re.match(r"^PAUSE\s+(.+)$", text, re.I);
         if match:
-            frames = float(self.expr.eval(match.group(1)));
-            if frames < 0: raise BasicError("PAUSE requires a non-negative frame count");
-            if frames == 0:
-                while not self.inkey_func():
-                    self._stop_if_requested();
-                    if not self.graphics.service(0.01):
-                        self.sleep_func(0.01);
-            else:
-                seconds = frames / 50.0;
-                if not self.graphics.service(seconds):
-                    self.sleep_func(seconds);
+            seconds = float(self.expr.eval(match.group(1)));
+            if seconds < 0: raise BasicError("PAUSE requires a non-negative number of seconds");
+            interrupted = self.graphics.pause(seconds);
+            if interrupted is not None:
                 self._stop_if_requested();
+                return pc + 1;
+            started = time.monotonic();
+            while True:
+                self._stop_if_requested();
+                key = self.inkey_func();
+                if key:
+                    self._preserve_inkey(key);
+                    break;
+                if seconds > 0 and time.monotonic() - started >= seconds:
+                    break;
+                remaining = 0.01 if seconds == 0 else max(0.0, min(0.01, seconds - (time.monotonic() - started)));
+                if remaining <= 0 and seconds > 0:
+                    break;
+                self.sleep_func(remaining or 0.001);
             return pc + 1;
         match = re.match(r"^BEEP\s+(.+)$", text, re.I);
         if match:
@@ -1037,6 +1055,135 @@ class BasicInterpreter:
     def _graphics_value_list(self, body):
         parts = self._split_top_level(str(body or ""), separators=",", keep_empty=False);
         return [self.expr.eval(part) for part in parts];
+
+    def _chart_clause_positions(self, body):
+        """Return top-level named CHART clause boundaries.
+
+        Quoted text and bracketed expressions are ignored while looking for
+        clause keywords, so category strings may contain ordinary words such
+        as TITLE or SIZE without confusing the parser.
+        """;
+        source = str(body or "");
+        keywords = ("TITLE FONT SIZE", "FONT SIZE", "RENDERER", "BACKEND", "SERIES", "LEGEND", "TITLE", "SIZE", "AT", "X", "Y");
+        positions = [];
+        quote = None;
+        depth = 0;
+        index = 0;
+        upper = source.upper();
+        while index < len(source):
+            char = source[index];
+            if quote is not None:
+                if char == quote:
+                    if index + 1 < len(source) and source[index + 1] == quote:
+                        index += 2;
+                        continue;
+                    quote = None;
+                index += 1;
+                continue;
+            if char in ('"', "'"):
+                quote = char;
+                index += 1;
+                continue;
+            if char in "([{":
+                depth += 1;
+                index += 1;
+                continue;
+            if char in ")]}":
+                depth = max(0, depth - 1);
+                index += 1;
+                continue;
+            if depth == 0:
+                for keyword in keywords:
+                    end = index + len(keyword);
+                    if upper[index:end] != keyword:
+                        continue;
+                    before_ok = index == 0 or not (upper[index - 1].isalnum() or upper[index - 1] == "_");
+                    after_ok = end >= len(source) or not (upper[end].isalnum() or upper[end] == "_");
+                    if before_ok and after_ok:
+                        positions.append((index, end, keyword));
+                        index = end;
+                        break;
+                else:
+                    index += 1;
+                continue;
+            index += 1;
+        return positions;
+
+    def _chart_sequence(self, source):
+        parts = self._split_top_level(str(source or ""), separators=",", keep_empty=False);
+        if not parts:
+            return ();
+        if len(parts) == 1:
+            value = self.expr.eval(parts[0]);
+            if isinstance(value, (list, tuple)):
+                return tuple(value);
+            return (value,);
+        return tuple(self.expr.eval(part) for part in parts);
+
+    def _named_chart_spec(self, body):
+        positions = self._chart_clause_positions(body);
+        if not positions:
+            return None;
+        kind = str(body[:positions[0][0]]).strip().strip('"\'').lower();
+        if not kind:
+            raise BasicError("CHART requires a chart kind");
+        clauses = {};
+        for item_index, (start, end, keyword) in enumerate(positions):
+            value_end = positions[item_index + 1][0] if item_index + 1 < len(positions) else len(body);
+            clauses[keyword] = str(body[end:value_end]).strip();
+        if "X" not in clauses or "Y" not in clauses:
+            return None;
+        categories = self._chart_sequence(clauses.get("X", ""));
+        values = self._chart_sequence(clauses.get("Y", ""));
+        if not values:
+            raise BasicError("CHART Y requires at least one value");
+        title = str(self.expr.eval(clauses["TITLE"])) if clauses.get("TITLE") else "";
+        name = str(self.expr.eval(clauses["SERIES"])) if clauses.get("SERIES") else "";
+        font_size = int(self.expr.eval(clauses["FONT SIZE"])) if clauses.get("FONT SIZE") else 0;
+        title_size = int(self.expr.eval(clauses["TITLE FONT SIZE"])) if clauses.get("TITLE FONT SIZE") else 0;
+        renderer_source = clauses.get("RENDERER") or clauses.get("BACKEND") or "";
+        renderer_literal = str(renderer_source or "").strip();
+        if renderer_literal.upper() in ("NATIVE", "MATPLOTLIB", "MPL", "SEABORN", "SNS"):
+            renderer = renderer_literal.lower();
+        else:
+            renderer = str(self.expr.eval(renderer_source)).strip().lower() if renderer_source else "native";
+        if renderer == "mpl": renderer = "matplotlib";
+        if renderer == "sns": renderer = "seaborn";
+        options = [];
+        if renderer:
+            options.append(("renderer", renderer));
+        if kind in ("hbar", "horizontal", "horizontal_bar"):
+            kind = "bar";
+            options.append(("orientation", "horizontal"));
+        base_font = FontSpec(size=font_size);
+        heading_font = FontSpec(size=title_size, bold=True);
+        if kind == "radar":
+            spec = ChartSpec.radar(categories, values, title=title, name=name);
+        elif kind == "pie":
+            spec = ChartSpec.pie(categories, values, title=title, name=name);
+        elif kind in ("line", "scatter"):
+            constructor = ChartSpec.line if kind == "line" else ChartSpec.scatter;
+            spec = constructor(tuple((index, value) for index, value in enumerate(values)), title=title, name=name);
+            spec = ChartSpec(spec.kind, title=spec.title, categories=tuple(str(item) for item in categories), series=spec.series, x_axis=spec.x_axis, y_axis=spec.y_axis, legend=spec.legend, stacked=spec.stacked);
+        else:
+            spec = ChartSpec.bar(categories, values, title=title, name=name);
+        spec = ChartSpec(spec.kind, title=spec.title, categories=spec.categories, series=spec.series, x_axis=spec.x_axis, y_axis=spec.y_axis, legend=spec.legend, stacked=spec.stacked, options=tuple(list(spec.options) + options), font=base_font, title_font=heading_font);
+        mode = self.graphics.ensure_mode();
+        x = 20;
+        y = 20;
+        width = max(1, int(mode.logical_width) - 40);
+        height = max(1, int(mode.logical_height) - 40);
+        if clauses.get("AT"):
+            at_values = self._chart_sequence(clauses["AT"]);
+            if len(at_values) != 2:
+                raise BasicError("CHART AT requires x,y");
+            x, y = at_values;
+        if clauses.get("SIZE"):
+            size_values = self._chart_sequence(clauses["SIZE"]);
+            if len(size_values) != 2:
+                raise BasicError("CHART SIZE requires width,height");
+            width, height = size_values;
+        return x, y, width, height, spec;
 
     def _execute_graphics_statement(self, text):
         raw = str(text).strip();
@@ -1246,6 +1393,10 @@ class BasicInterpreter:
             return True;
         match = re.match(r"^CHART\s+(.+)$", raw, re.I);
         if match:
+            named = self._named_chart_spec(match.group(1));
+            if named is not None:
+                self.graphics.emit("chart", tuple(named));
+                return True;
             parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
             if len(parts) < 7:
                 raise BasicError('CHART requires kind,x,y,width,height,categories,values [,title]');
