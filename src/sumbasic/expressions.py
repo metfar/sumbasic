@@ -152,9 +152,42 @@ class ExpressionEvaluator:
 
     @staticmethod
     def _val_first_number(value):
-        match = re.search(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", str(value));
+        """Extract the first BASIC-style number from arbitrary text.
+
+        sumBASIC deliberately keeps the tolerant data-import semantics agreed
+        for VAL(): English numeric format, comma thousands separators,
+        scientific notation, and an optional accounting sign before *or* after
+        the number.  The first exterior sign wins; exponent signs are part of
+        the exponent and do not count as exterior signs.
+        """;
+        source = str(value);
+        pattern = re.compile(
+            r"(?P<lead>[+-])?\s*"
+            r"(?P<num>(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
+            r"(?P<trail>[+-])?"
+        );
+        match = pattern.search(source);
         if not match: return 0;
-        text=match.group(0); number=float(text); return int(number) if number.is_integer() else number;
+        number_text = match.group("num").replace(",", "");
+        number = float(number_text);
+        lead = match.group("lead");
+        trail = match.group("trail");
+        sign = lead if lead is not None else trail;
+        if sign == "-": number = -abs(number);
+        elif sign == "+": number = abs(number);
+        return int(number) if number.is_integer() else number;
+
+    @staticmethod
+    def _format_base(value, base, width=0, uppercase=False):
+        number = int(value);
+        sign = "-" if number < 0 else "";
+        digits = format(abs(number), {2: "b", 8: "o", 16: "X" if uppercase else "x"}[int(base)]);
+        digits = digits.rjust(max(0, int(width)), "0");
+        return sign + digits;
+
+    @staticmethod
+    def _basic_boolean(value):
+        return -1 if bool(value) else 0;
 
     @staticmethod
     def _basic_string(value):
@@ -171,8 +204,9 @@ class ExpressionEvaluator:
     def get(self, name):
         upper = str(name).upper();
         if upper == "PI": return ZX_SPECTRUM_PI;
-        if upper == "TRUE": return True;
-        if upper == "FALSE": return False;
+        if upper in ("TRUE", "__BASIC_TRUE"): return -1;
+        if upper in ("FALSE", "__BASIC_FALSE"): return 0;
+        if upper in ("NULL", "NIL", "NONE", "__BASIC_NULL"): return None;
         key = self.key(name);
         if key in self.variables: return self.variables[key];
         if str(name).endswith("$"): return "";
@@ -281,9 +315,10 @@ class ExpressionEvaluator:
             "VAL": lambda x: self._val_first_number(x),
             "EVAL": lambda x: self.eval(str(x)),
             "VAL$": lambda x: str(x),
-            "BIN": lambda x: format(int(x), "b"),
-            "HEX$": lambda x: format(int(x), "X"),
-            "OCT$": lambda x: format(int(x), "o"),
+            "BIN": lambda x: self._format_base(x, 2),
+            "BIN$": lambda x, width=0: self._format_base(x, 2, width),
+            "HEX$": lambda x, width=0: self._format_base(x, 16, width, uppercase=True),
+            "OCT$": lambda x, width=0: self._format_base(x, 8, width),
             "DECIMAL": lambda x=0: Decimal(str(x)),
             "COMPLEX": lambda real=0, imag=0: complex(real, imag),
             "CMPLX": lambda real=0, imag=0: complex(real, imag),
@@ -334,6 +369,14 @@ class ExpressionEvaluator:
         return re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*[$%&!]", encode_suffix, segment);
 
     def _transform(self, segment, encoded):
+        # Normalize language aliases before Python's parser can reinterpret
+        # True/False/None using Python's own numeric semantics.
+        segment = re.sub(r"\bTRUE\b", "__BASIC_TRUE", segment, flags=re.I);
+        segment = re.sub(r"\bFALSE\b", "__BASIC_FALSE", segment, flags=re.I);
+        segment = re.sub(r"\b(?:NULL|NIL|NONE)\b", "__BASIC_NULL", segment, flags=re.I);
+        # Classic Spectrum BIN plus Sum's modern binary literal alias.
+        segment = re.sub(r"\bBIN\s+([01]+)\b", lambda m: str(int(m.group(1), 2)), segment, flags=re.I);
+        segment = re.sub(r"(?<![A-Za-z0-9_])%([01]+)\b", lambda m: str(int(m.group(1), 2)), segment);
         segment = re.sub(r"\bXOR\b", " __SUMBASIC_XOR__ ", segment, flags=re.I);
         segment = re.sub(r"<>", " != ", segment);
         segment = re.sub(r"(?<![<>=!])=(?!=)", "==", segment);
@@ -348,6 +391,12 @@ class ExpressionEvaluator:
         segment = re.sub(r"(?<![A-Za-z0-9_])INKEY\$(?!\s*\()", "INKEY$()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])TIME\$(?!\s*\()", "TIME$()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])TIMER(?![A-Za-z0-9_$%&!]|\s*\()", "TIMER()", segment, flags=re.I);
+        for builtin in ("COLS", "ROWS", "GWIDTH", "GHEIGHT", "GCOLORS", "CURSOR"):
+            # Preserve backward compatibility with variables such as Rows.
+            # A user variable shadows the bare convenience spelling; the
+            # explicit ROWS()/COLS() function form always remains available.
+            if self.key(builtin) not in self.variables and self.key(builtin) not in self.arrays:
+                segment = re.sub(r"(?<![A-Za-z0-9_])" + builtin + r"(?![A-Za-z0-9_$%&!]|\s*\()", builtin + "()", segment, flags=re.I);
         segment = segment.replace("^", "**");
         segment = segment.replace("__SUMBASIC_XOR__", "^");
         segment = re.sub(r"&H([0-9A-Fa-f]+)", lambda m: str(int(m.group(1), 16)), segment);
@@ -390,7 +439,9 @@ class ExpressionEvaluator:
         return getattr(self, "_encoded_names", {}).get(node.id, node.id);
 
     def _node(self, node):
-        if isinstance(node, ast.Constant): return node.value;
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, bool): return self._basic_boolean(node.value);
+            return node.value;
         if isinstance(node, ast.Name): return self.get(getattr(self, "_encoded_names", {}).get(node.id, node.id));
         if isinstance(node, ast.List): return [self._node(item) for item in node.elts];
         if isinstance(node, ast.Tuple): return tuple(self._node(item) for item in node.elts);
@@ -414,7 +465,7 @@ class ExpressionEvaluator:
                 ast.Pow: lambda: first ** second,
                 ast.LShift: lambda: int(a) << int(b),
                 ast.RShift: lambda: int(a) >> int(b),
-                ast.BitXor: lambda: (bool(a) ^ bool(b)) if isinstance(a, bool) and isinstance(b, bool) else (int(a) ^ int(b)),
+                ast.BitXor: lambda: self._basic_boolean(bool(a) ^ bool(b)) if isinstance(a, complex) or isinstance(b, complex) else (int(a) ^ int(b)),
                 ast.BitAnd: lambda: int(a) & int(b),
                 ast.BitOr: lambda: int(a) | int(b),
             };
@@ -424,19 +475,28 @@ class ExpressionEvaluator:
             value = self._node(node.operand);
             if isinstance(node.op, ast.USub): return -value;
             if isinstance(node.op, ast.UAdd): return +value;
-            if isinstance(node.op, ast.Not): return not value;
+            if isinstance(node.op, ast.Not):
+                if isinstance(value, (int, bool)) and not isinstance(value, complex): return ~int(value);
+                return self._basic_boolean(not bool(value));
             if isinstance(node.op, ast.Invert): return ~int(value);
         if isinstance(node, ast.BoolOp):
-            values = [bool(self._node(item)) for item in node.values];
-            return all(values) if isinstance(node.op, ast.And) else any(values);
+            values = [self._node(item) for item in node.values];
+            integral = all(isinstance(value, (int, bool)) and not isinstance(value, complex) for value in values);
+            if integral:
+                result = int(values[0]) if values else 0;
+                for value in values[1:]:
+                    result = (result & int(value)) if isinstance(node.op, ast.And) else (result | int(value));
+                return result;
+            truth = [bool(value) for value in values];
+            return self._basic_boolean(all(truth) if isinstance(node.op, ast.And) else any(truth));
         if isinstance(node, ast.Compare):
             left = self._node(node.left);
             for op, comparator in zip(node.ops, node.comparators):
                 right = self._node(comparator);
                 ok = ((isinstance(op, ast.Eq) and left == right) or (isinstance(op, ast.NotEq) and left != right) or (isinstance(op, ast.Lt) and left < right) or (isinstance(op, ast.LtE) and left <= right) or (isinstance(op, ast.Gt) and left > right) or (isinstance(op, ast.GtE) and left >= right));
-                if not ok: return False;
+                if not ok: return 0;
                 left = right;
-            return True;
+            return -1;
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             name = getattr(self, "_encoded_names", {}).get(node.func.id, node.func.id);
             key = self.key(name);

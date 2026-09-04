@@ -20,6 +20,7 @@
 #  MA 02110-1301, USA.
 #  
 import re;
+import shutil;
 import threading;
 import time;
 from pathlib import Path;
@@ -33,7 +34,7 @@ from .program import BasicProgram;
 from .shell import ShellExecutionError, run_interactive_shell, run_shell_command;
 from .types import BasicArray, base_type, coerce_value, default_value, normalize_type, suffix_type;
 from .vocabulary import GRAPHICS_FUNCTION_STUBS, GRAPHICS_STUBS;
-from sumui import ChartSeries, ChartSpec, FontSpec, ImageSpec, TableSpec;
+from sumui import ChartSeries, ChartSpec, CursorState, FontSpec, ImageSpec, TableSpec, TextScreen, coerce_cursor_state;
 from sumdata import read_rds, save_rds;
 
 
@@ -53,7 +54,7 @@ class _BasicStop(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None, text_screen=None):
         self.program = BasicProgram();
         self.variables = {};
         self.variable_types = {};
@@ -71,6 +72,10 @@ class BasicInterpreter:
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
         self.audio = AudioEngine(tone_func=tone_func, sleep_func=self.sleep_func);
         self.graphics = GraphicsRuntime(handler=graphics_handler);
+        self.text_screen = text_screen if text_screen is not None else TextScreen(size_provider=self._default_text_size, fallback=(80,25));
+        self.patterns = {};
+        self.paper_color = 0;
+        self.border_color = 0;
         self.memory = bytearray(65536);
         self.tone_player = self.audio.sound_player;
         self.tone_func = tone_func if tone_func is not None else self.audio.sound;
@@ -89,6 +94,12 @@ class BasicInterpreter:
             "PEEK": lambda address: self.memory[int(address) & 0xffff],
             "IN": lambda *args: 0,
             "USR": lambda *args: 0,
+            "COLS": lambda: self.text_screen.cols,
+            "ROWS": lambda: self.text_screen.rows,
+            "GWIDTH": lambda: self._gwidth(),
+            "GHEIGHT": lambda: self._gheight(),
+            "GCOLORS": lambda: self._gcolors(),
+            "CURSOR": lambda: self._cursor_value(),
             "READRDS": lambda path: read_rds(path),
             "SAVERDS": lambda path, value: save_rds(path, value),
         }, now_func=now_func);
@@ -116,9 +127,54 @@ class BasicInterpreter:
         self.data_index = 0;
         self.data_line_index = {};
         self.option_base = 0;
+        self.patterns = {};
         self._resume_context = None;
         self.stopped_by_statement = False;
         self.graphics.text_mode();
+
+    @staticmethod
+    def _default_text_size():
+        size = shutil.get_terminal_size(fallback=(80,25));
+        return size.columns, size.lines;
+
+    def _gwidth(self):
+        mode = self.graphics.mode;
+        return int(mode.logical_width) if mode is not None else 640;
+
+    def _gheight(self):
+        mode = self.graphics.mode;
+        return int(mode.logical_height) if mode is not None else 480;
+
+    def _gcolors(self):
+        mode = self.graphics.mode;
+        if mode is None: return 16;
+        colors = mode.option("colors", None);
+        if colors is not None: return int(colors);
+        if mode.profile == "spectrum": return 16;
+        return 16777216;
+
+    def _cursor_value(self):
+        state = self.text_screen.cursor();
+        if state == CursorState.HIDDEN: return 0;
+        if state == CursorState.BLOCK: return 1;
+        return -1;
+
+    def _set_cursor(self, value):
+        # BASIC keeps TRUE=-1 and reserves +1 for the full block cursor.
+        if isinstance(value, str):
+            key = value.strip().upper();
+            aliases = {
+                "OFF": CursorState.HIDDEN, "HIDE": CursorState.HIDDEN, "FALSE": CursorState.HIDDEN,
+                "ON": CursorState.NORMAL, "SHOW": CursorState.NORMAL, "NORMAL": CursorState.NORMAL, "UNDERSCORE": CursorState.NORMAL, "UNDERLINE": CursorState.NORMAL, "TRUE": CursorState.NORMAL,
+                "BLOCK": CursorState.BLOCK,
+            };
+            if key in aliases: return self.text_screen.cursor(aliases[key]);
+        numeric = int(value);
+        if numeric == 0: state = CursorState.HIDDEN;
+        elif numeric == -1: state = CursorState.NORMAL;
+        elif numeric == 1: state = CursorState.BLOCK;
+        else: raise BasicError("CURSOR expects 0/OFF, -1/ON/NORMAL, or 1/BLOCK");
+        return self.text_screen.cursor(state);
 
     def _db(self):
         if self.database is None: self.database = BasicDatabase(max_areas=10);
@@ -151,6 +207,17 @@ class BasicInterpreter:
             return real_text + ("-" if imag < 0 else "+") + imag_text + "i";
         if isinstance(value, float) and value.is_integer(): return str(int(value));
         return str(value);
+
+    @staticmethod
+    def _printf_format(format_text, values):
+        """C/printf-style formatting used by PRINTF and GPRINTF.""";
+        fmt = str(format_text);
+        values = tuple(values);
+        try:
+            if not values: return fmt;
+            return fmt % (values[0] if len(values) == 1 else values);
+        except (TypeError, ValueError) as exc:
+            raise BasicError("PRINTF format error: {}".format(exc)) from exc;
 
     def _emit(self, text="", end="\n"):
         try:
@@ -301,18 +368,21 @@ class BasicInterpreter:
         text = str(source).strip();
         if text == "": return "";
         if len(text) >= 2 and text[0] == text[-1] == '"': return text[1:-1].replace('""', '"');
-        if re.fullmatch(r"[+-]?&H[0-9A-Fa-f]+", text):
+        if re.fullmatch(r"[+-]?(?:&H|0X)[0-9A-Fa-f]+", text, re.I):
             sign = -1 if text.startswith("-") else 1;
-            raw = text.lstrip("+-")[2:];
+            raw = text.lstrip("+-");
+            raw = raw[2:];
             return sign * int(raw, 16);
-        if re.fullmatch(r"[+-]?&O[0-7]+", text):
+        if re.fullmatch(r"[+-]?(?:&O|0O)[0-7]+", text, re.I):
             sign = -1 if text.startswith("-") else 1;
             raw = text.lstrip("+-")[2:];
             return sign * int(raw, 8);
-        if re.fullmatch(r"[+-]?&B[01]+", text):
+        if re.fullmatch(r"[+-]?(?:&B|0B)[01]+", text, re.I):
             sign = -1 if text.startswith("-") else 1;
             raw = text.lstrip("+-")[2:];
             return sign * int(raw, 2);
+        bin_match = re.fullmatch(r"([+-]?)BIN\s+([01]+)", text, re.I);
+        if bin_match: return (-1 if bin_match.group(1) == "-" else 1) * int(bin_match.group(2), 2);
         if re.fullmatch(r"[+-]?\d+", text): return int(text);
         if re.fullmatch(r"[+-]?(?:\d+\.\d*|\d*\.\d+)(?:[Ee][+-]?\d+)?", text) or re.fullmatch(r"[+-]?\d+[Ee][+-]?\d+", text): return float(text);
         return text;
@@ -414,6 +484,9 @@ class BasicInterpreter:
             r'^DB\.SELECT\s+.+$', r'^DB\.USE(?:\s+.+?)?(?:\s+ALIAS\s+[A-Za-z_][A-Za-z0-9_]*)?$',
             r'^DB\.GO\s+.+$', r'^DB\.SKIP(?:\s+.+)?$', r'^DB\.CLOSE$',
             r'^LOCATE\s+.+?\s*,\s*.+$', r'^GOTOXY\s+.+?\s*,\s*.+$',
+            r'^CURSOR\s+.+$', r'^CLEAR\s+(?:TEXTLAYER|GRAPHLAYER|GRAPHICSLAYER|BACKGROUNDLAYER|BORDERLAYER|TEXT|GRAPHICS|BACKGROUND|BORDER)$',
+            r'^SORT\s+LAYERS\s+.+$', r'^DEF\s+PATTERN\s+.+$', r'^PRINTF\s+.+$',
+            r'^GPRINT(?:F)?\s+.+$', r'^BORDER\s+(?:INK|PAPER|PATTERN|OFFSET|SCROLL)\s+.+$',
             r'^(?:LINE\s+INPUT|INPUT)\s*(?:"[^"]*"\s*[;,])?\s*[A-Za-z_][A-Za-z0-9_]*[$%&!]?$',
             r'^GOTO\s+(?:[A-Za-z_][A-Za-z0-9_]*|\d+)$', r'^GOSUB\s+(?:[A-Za-z_][A-Za-z0-9_]*|\d+)$',
             r'^FOR\s+EACH\s+.+?\s+IN\s+.+$',
@@ -470,6 +543,7 @@ class BasicInterpreter:
         return True;
 
     def run(self):
+        previous_cursor = self.text_screen.cursor();
         self.stop_requested.clear();
         self.stopped_by_request = False;
         self.stopped_by_statement = False;
@@ -484,7 +558,10 @@ class BasicInterpreter:
             self._match_blocks(execution, "WHILE", "WEND"),
             self._match_blocks(execution, "DO", "LOOP"),
         );
-        return self._execute_context(context, 0);
+        try: return self._execute_context(context, 0);
+        finally:
+            try: self.text_screen.cursor(previous_cursor);
+            except Exception: pass;
 
     def execute_direct(self, source):
         """Execute direct-mode BASIC without clearing variables or arrays.
@@ -677,8 +754,51 @@ class BasicInterpreter:
             return pc + 1;
         if upper.startswith("DATA") and (upper == "DATA" or upper.startswith("DATA ")): return pc + 1;
         if upper == "CLS":
+            # CLS means the whole composed screen: clear the text grid, clear
+            # drawings, and repaint BACKGROUND/BORDER with their current state.
             self._emit("\033[2J\033[H", end="");
-            if self.graphics.mode is not None: self.graphics.clear();
+            if self.graphics.mode is not None:
+                self.graphics.clear(self.paper_color);
+                self.graphics.emit("clear_layer", ("BORDER",));
+            return pc + 1;
+        match = re.match(r"^CURSOR(?:\s+(.+))?$", text, re.I);
+        if match:
+            if not match.group(1):
+                raise BasicError("CURSOR statement requires OFF/ON/BLOCK or 0/-1/1; use CURSOR in an expression to query it");
+            raw = match.group(1).strip();
+            key = raw.upper();
+            if key in ("OFF", "HIDE", "FALSE", "ON", "SHOW", "NORMAL", "UNDERSCORE", "UNDERLINE", "TRUE", "BLOCK"):
+                self._set_cursor(key);
+            else:
+                self._set_cursor(self.expr.eval(raw));
+            return pc + 1;
+        match = re.match(r"^CLEAR\s+(TEXTLAYER|GRAPHLAYER|GRAPHICSLAYER|BACKGROUNDLAYER|BORDERLAYER|TEXT|GRAPHICS|BACKGROUND|BORDER)$", text, re.I);
+        if match:
+            layer = match.group(1).upper();
+            if layer in ("TEXT", "TEXTLAYER"):
+                self._emit("\033[2J\033[H", end="");
+            elif layer in ("GRAPHICS", "GRAPHLAYER", "GRAPHICSLAYER"):
+                self.graphics.emit("clear_layer", ("GRAPHICS",));
+            elif layer in ("BACKGROUND", "BACKGROUNDLAYER"):
+                self.graphics.emit("paper", (self.paper_color,));
+                self.graphics.emit("clear_layer", ("BACKGROUND",));
+            else:
+                self.graphics.emit("clear_layer", ("BORDER",));
+            return pc + 1;
+        match = re.match(r"^SORT\s+LAYERS\s+(.+?)(?:\s+(ASC|DESC))?$", text, re.I);
+        if match:
+            names = [part.strip() for part in self._split_top_level(match.group(1), separators=",", keep_empty=False)];
+            if not names: raise BasicError("SORT LAYERS requires at least one layer");
+            direction = (match.group(2) or "ASC").upper();
+            self.graphics.emit("sort_layers", (tuple(names), direction));
+            return pc + 1;
+        match = re.match(r"^DEF\s+PATTERN\s+(.+)$", text, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(parts) != 9: raise BasicError("DEF PATTERN requires id plus exactly 8 byte values");
+            pattern_id = int(self.expr.eval(parts[0]));
+            rows = tuple(int(self.expr.eval(part)) & 0xff for part in parts[1:]);
+            self.patterns[pattern_id] = rows;
             return pc + 1;
         match = re.match(r"^OPTION\s+BASE\s+([01])$", text, re.I);
         if match: self.option_base = int(match.group(1)); return pc + 1;
@@ -789,6 +909,14 @@ class BasicInterpreter:
                 if expression: rendered += self._format_value(self.expr.eval(expression));
                 if separator == ",": rendered += "\t";
             self._emit(rendered, end="" if trailing else "\n"); return pc + 1;
+        match = re.match(r"^PRINTF\s+(.+)$", text, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if not parts: raise BasicError("PRINTF requires format [,values...]");
+            fmt = self.expr.eval(parts[0]);
+            values = [self.expr.eval(part) for part in parts[1:]];
+            self._emit(self._printf_format(fmt, values), end="");
+            return pc + 1;
         if upper.startswith("PRINT") or text.startswith("?"):
             body = text[1:].strip() if text.startswith("?") else text[5:].strip();
             if body.upper().startswith("USING "): return self._print_using(body[6:].strip(), pc);
@@ -1202,6 +1330,44 @@ class BasicInterpreter:
 
     def _execute_graphics_statement(self, text):
         raw = str(text).strip();
+        match = re.match(r"^GPRINTF\s+(.+)$", raw, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(parts) < 3: raise BasicError("GPRINTF requires x,y,format [,values...]");
+            x = self.expr.eval(parts[0]); y = self.expr.eval(parts[1]);
+            fmt = self.expr.eval(parts[2]); values = [self.expr.eval(part) for part in parts[3:]];
+            self.graphics.emit("text", (x, y, self._printf_format(fmt, values)));
+            return True;
+        match = re.match(r"^GPRINT\s+(.+)$", raw, re.I);
+        if match:
+            parts = self._split_top_level(match.group(1), separators=",", keep_empty=False);
+            if len(parts) < 3 or len(parts) > 6: raise BasicError("GPRINT requires x,y,text [,color [,size [,font]]]");
+            x = self.expr.eval(parts[0]); y = self.expr.eval(parts[1]); value = str(self.expr.eval(parts[2])); options = {};
+            if len(parts) > 3: options["color"] = self.expr.eval(parts[3]);
+            if len(parts) > 4: options["size"] = int(self.expr.eval(parts[4]));
+            if len(parts) > 5: options["font_name"] = str(self.expr.eval(parts[5]));
+            self.graphics.emit("text", (x, y, value), **options);
+            return True;
+        match = re.match(r"^BORDER\s+INK\s+(.+)$", raw, re.I);
+        if match:
+            self.graphics.emit("border_ink", (self.expr.eval(match.group(1)),)); return True;
+        match = re.match(r"^BORDER\s+PAPER\s+(.+)$", raw, re.I);
+        if match:
+            self.graphics.emit("border_paper", (self.expr.eval(match.group(1)),)); return True;
+        match = re.match(r"^BORDER\s+PATTERN\s+OFF$", raw, re.I);
+        if match:
+            self.graphics.emit("border_pattern", (None,)); return True;
+        match = re.match(r"^BORDER\s+PATTERN\s+(.+)$", raw, re.I);
+        if match:
+            pattern_id = int(self.expr.eval(match.group(1)));
+            if pattern_id not in self.patterns: raise BasicError("Undefined PATTERN {}".format(pattern_id));
+            self.graphics.emit("border_pattern", (self.patterns[pattern_id],)); return True;
+        match = re.match(r"^BORDER\s+OFFSET\s+(.+?)\s*,\s*(.+)$", raw, re.I);
+        if match:
+            self.graphics.emit("border_offset", (self.expr.eval(match.group(1)), self.expr.eval(match.group(2)))); return True;
+        match = re.match(r"^BORDER\s+SCROLL\s+(.+?)\s*,\s*(.+)$", raw, re.I);
+        if match:
+            self.graphics.emit("border_scroll", (self.expr.eval(match.group(1)), self.expr.eval(match.group(2)))); return True;
         match = re.match(r"^POKE\s+(.+?)\s*,\s*(.+)$", raw, re.I);
         if match:
             address = int(self.expr.eval(match.group(1))) & 0xffff;
@@ -1291,7 +1457,11 @@ class BasicInterpreter:
             self.graphics.emit("screen",tuple(values)); return True;
         match = re.match(r"^DISPLAY(?:\s+|\s*\()(.*?)(?:\))?$", raw, re.I);
         if match:
-            body=(match.group(1) or "").strip(); upper_body=body.upper();
+            body=(match.group(1) or "").strip();
+            # With whitespace before an opening parenthesis the historical
+            # regex can leave that '(' in group(1); normalize both spellings.
+            if body.startswith("("): body = body[1:].strip();
+            upper_body=body.upper();
             if upper_body in ("UPDATE","REFRESH","REDRAW"):
                 self.graphics.update(); return True;
             page_match=re.match(r"^(ACTIVE|VISIBLE)\s+(.+)$",body,re.I);
@@ -1453,7 +1623,11 @@ class BasicInterpreter:
             return True;
         match = re.match(r"^(INK|PAPER|BORDER|BRIGHT|FLASH|INVERSE|OVER)\s+(.+)$", raw, re.I);
         if match:
-            self.graphics.emit(match.group(1).lower(), (self.expr.eval(match.group(2)),));
+            command = match.group(1).upper();
+            value = self.expr.eval(match.group(2));
+            if command == "PAPER": self.paper_color = value;
+            if command == "BORDER": self.border_color = value;
+            self.graphics.emit(command.lower(), (value,));
             return True;
         return False;
 

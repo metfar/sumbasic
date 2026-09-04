@@ -629,6 +629,253 @@
       ],
       "aliases": [],
       "language": "basic"
+    },
+    {
+      "name": "VAL",
+      "category": "Graphics and images",
+      "summary": "Extracts the first numeric value from arbitrary text without evaluating an expression. sumBASIC uses English numeric notation: `.` is the decimal point, `,` groups thousands, and `e`/`E` introduces a decimal exponent. An exterior `+` or `-` may appear before or immediately after the number; the first exterior sign found wins. A sign following `e`/`E` belongs to the exponent instead.",
+      "syntax": [
+        "VAL(text)"
+      ],
+      "example": "PRINT VAL(\"   U -1.5p6\")\nPRINT VAL(\"   LUN 1.5-6\")\nPRINT VAL(\"USD 10-\")\nPRINT VAL(\"+10-\")\nPRINT VAL(\"1,234.5\")\nPRINT VAL(\"45.3e-6\")\nPRINT VAL(\"2+2\")",
+      "notes": [
+        "The examples above return `-1.5`",
+        "`-1.5`",
+        "`-10`",
+        "`10`",
+        "`1234.5`",
+        "`0.0000453`",
+        "and `2`.",
+        "`VAL` never evaluates arithmetic operators. Use `EVAL` when expression evaluation is intended."
+      ],
+      "see_also": [
+        "EVAL",
+        "STR$",
+        "HEX$",
+        "OCT$",
+        "BIN$"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "EVAL",
+      "category": "Graphics and images",
+      "summary": "Evaluates a BASIC expression in the current variable environment.",
+      "syntax": [
+        "EVAL(text)"
+      ],
+      "example": "a = 2\nPRINT EVAL(\"a+2\")\nPRINT VAL(\"2+2\")",
+      "notes": [],
+      "see_also": [
+        "VAL"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "RDS (r20)",
+      "category": "Graphics and images",
+      "summary": "`READRDS(path)` and `SAVERDS(path,value)` are adapters to the common `sumData` RDS layer.",
+      "syntax": [
+        "READRDS(path)",
+        "SAVERDS(path,value)"
+      ],
+      "example": "ok = SAVERDS(\"value.rds\", 42)\nPRINT READRDS(\"value.rds\")",
+      "notes": [],
+      "see_also": [
+        "VAL",
+        "EVAL"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "COLS / ROWS",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Returns the current text-grid dimensions. The backend is queried on every access, so terminal resize, Android orientation, soft-keyboard and GUI font/cell changes are visible without restarting the program.",
+      "syntax": [
+        "COLS",
+        "ROWS",
+        "COLS()",
+        "ROWS()"
+      ],
+      "example": "PRINT \"Text grid: \"; COLS; \"x\"; ROWS\nIF COLS < 42 THEN PRINT \"Compact layout\"",
+      "notes": [
+        "`COLS` and `ROWS` are counts. Text cursor coordinates remain one-based for `LOCATE`.",
+        "The fallback is 80 columns by 25 rows only when the active backend cannot report its viewport."
+      ],
+      "see_also": [
+        "CURSOR",
+        "POS",
+        "CSRLIN",
+        "GWIDTH / GHEIGHT / GCOLORS"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "CURSOR",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Controls the text-grid caret independently from the graphics plane. sumBASIC keeps its classic numeric boolean representation: `FALSE=0`, `TRUE=-1`; the positive value `1` is reserved for the full block cursor. The runtime restores the previous visible cursor state when program execution finishes.",
+      "syntax": [
+        "CURSOR OFF",
+        "CURSOR HIDE",
+        "CURSOR FALSE",
+        "CURSOR 0",
+        "CURSOR ON",
+        "CURSOR SHOW",
+        "CURSOR NORMAL",
+        "CURSOR UNDERSCORE",
+        "CURSOR TRUE",
+        "CURSOR -1",
+        "CURSOR BLOCK",
+        "CURSOR 1",
+        "CURSOR"
+      ],
+      "example": "CURSOR OFF\nPRINT \"redrawing...\";\nCURSOR ON\nPAUSE .05",
+      "notes": [
+        "`CURSOR` used as an expression returns `0`",
+        "`-1`",
+        "or `1`.",
+        "`CURSOR` never hides the mouse/touch pointer and does not affect `GPRINT`."
+      ],
+      "see_also": [
+        "COLS / ROWS",
+        "LOCATE",
+        "PRINT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "GWIDTH / GHEIGHT / GCOLORS",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Returns the logical graphics-plane width, height and color capacity. These metrics are independent from the text grid.",
+      "syntax": [
+        "GWIDTH",
+        "GHEIGHT",
+        "GCOLORS"
+      ],
+      "example": "DISPLAY (640,480,16,AUTO)\nPRINT \"Text: \"; COLS; \"x\"; ROWS\nPRINT \"Graphics: \"; GWIDTH; \"x\"; GHEIGHT; \" colors=\"; GCOLORS",
+      "notes": [],
+      "see_also": [
+        "DISPLAY",
+        "COLS / ROWS",
+        "GPRINT / GPRINTF"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "GPRINT / GPRINTF",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Draws text in graphics coordinates without moving the text-grid cursor. `GPRINTF` applies C/printf-style formatting before drawing.",
+      "syntax": [
+        "GPRINT x,y,text [,color [,size [,font_family]]]",
+        "GPRINTF x,y,format [,value ...]"
+      ],
+      "example": "DISPLAY (640,480,16,AUTO)\nLOCATE 2,2: PRINT \"TextGrid\"\nGPRINT 100,50,\"GraphicsSurface\"\nGPRINTF 100,80,\"%dx%d\",GWIDTH,GHEIGHT",
+      "notes": [
+        "`PRINT`/`PRINTF` target the text grid; `GPRINT`/`GPRINTF` target the graphics plane.",
+        "Graphics coordinates are logical points/pixels with `(0",
+        "0)` at the graphics origin."
+      ],
+      "see_also": [
+        "PRINT",
+        "PRINTF",
+        "FONT",
+        "GWIDTH / GHEIGHT / GCOLORS"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "CLEAR LAYER",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Clears one built-in screen plane without resetting the others. Plain `CLS` still clears the complete composed screen and refills background/border with the currently selected `PAPER`/`BORDER` state.",
+      "syntax": [
+        "CLEAR TEXTLAYER",
+        "CLEAR GRAPHLAYER",
+        "CLEAR BACKGROUNDLAYER",
+        "CLEAR BORDERLAYER"
+      ],
+      "example": "GPRINT 20,20,\"graphics\"\nPRINT \"text\"\nCLEAR TEXTLAYER",
+      "notes": [],
+      "see_also": [
+        "CLS",
+        "SORT LAYERS",
+        "BORDER"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "SORT LAYERS",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Reorders the built-in compositor by z-index. `ASC` is the default and lists selected layers from lower to higher z-index; `DESC` accepts the same selected layers from higher to lower. A partial list is valid: unmentioned layers keep their relative order below the selected block.",
+      "syntax": [
+        "SORT LAYERS layer [,layer ...] [ASC|DESC]"
+      ],
+      "example": "# Default: BORDER, BACKGROUND, GRAPHICS, TEXT\nSORT LAYERS GRAPHICS, TEXT\n# Still: BORDER, BACKGROUND, GRAPHICS, TEXT\n\nSORT LAYERS GRAPHICS, BORDER, TEXT\n# Becomes: BACKGROUND, GRAPHICS, BORDER, TEXT\n\nSORT LAYERS TEXT, BORDER, GRAPHICS DESC\n# Same resulting order as the previous statement",
+      "notes": [],
+      "see_also": [
+        "CLEAR LAYER",
+        "BORDER"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "DEF PATTERN / BORDER PATTERN",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Defines an 8x8 one-bit repeating tile and applies it to the BORDER plane. Set bits use `BORDER INK`; clear bits use `BORDER PAPER`. Offset and scroll alter the phase without redefining the pattern.",
+      "syntax": [
+        "DEF PATTERN id,b0,b1,b2,b3,b4,b5,b6,b7",
+        "BORDER INK color",
+        "BORDER PAPER color",
+        "BORDER PATTERN id",
+        "BORDER PATTERN OFF",
+        "BORDER OFFSET x,y",
+        "BORDER SCROLL dx,dy"
+      ],
+      "example": "DEF PATTERN 1,0b11110000,0b11110000,0b00001111,0b00001111,0b11110000,0b11110000,0b00001111,0b00001111\nBORDER PAPER 1\nBORDER INK 5\nBORDER PATTERN 1\nBORDER SCROLL 1,0",
+      "notes": [],
+      "see_also": [
+        "BORDER",
+        "SORT LAYERS",
+        "CLEAR LAYER"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "BASIC numeric literals (r20.2)",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Adds modern base prefixes to sumBASIC while preserving historical spellings. This extension is specific to sumBASIC.",
+      "syntax": [
+        "&H1FF     0x1FF",
+        "%11101    0b11101",
+        "BIN 11101",
+        "&O777     0o777"
+      ],
+      "example": "PRINT &H1FF; \" = \"; 0x1FF\nPRINT %11101; \" = \"; 0b11101; \" = \"; BIN 11101\nPRINT &O777; \" = \"; 0o777\nPRINT HEX$(255,4); OCT$(255,4); BIN$(5,8)",
+      "notes": [
+        "BASIC prefixes are case-insensitive.",
+        "`HEX$`",
+        "`OCT$`",
+        "and `BIN$` accept an optional minimum width padded with zeroes. Decimal text continues to use `STR$`."
+      ],
+      "see_also": [
+        "VAL",
+        "STR$",
+        "HEX$",
+        "OCT$",
+        "BIN$",
+        "<p align=center><b>- oOo -</b></p>"
+      ],
+      "aliases": [],
+      "language": "basic"
     }
   ]
 }

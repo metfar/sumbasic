@@ -36,6 +36,7 @@ from sumtui.events import Key, KeyEvent;
 from .interpreter import BasicError, BasicInterpreter;
 from .graphics import SumGuiGraphicsHandler;
 from .shell import run_interactive_shell;
+from sumui import CursorState, TextScreen, coerce_cursor_state;
 
 
 class _VirtualRunScreen:
@@ -51,7 +52,16 @@ class _VirtualRunScreen:
             self._rows = [""];
             self._row = 0;
             self._col = 0;
+            if not hasattr(self, "_cursor_state"): self._cursor_state = CursorState.NORMAL;
         return None;
+
+    def set_cursor_state(self, state):
+        with self._lock:
+            self._cursor_state = coerce_cursor_state(state);
+        return self._cursor_state;
+
+    def cursor_state(self):
+        with self._lock: return self._cursor_state;
 
     def _ensure_row(self, row):
         while len(self._rows) <= row:
@@ -111,9 +121,18 @@ class _VirtualRunScreen:
                 index += 1;
         return None;
 
-    def text(self):
+    def text(self, include_cursor=False):
         with self._lock:
             rows = list(self._rows);
+            row = self._row; col = self._col; state = self._cursor_state;
+        if include_cursor and state != CursorState.HIDDEN:
+            while len(rows) <= row: rows.append("");
+            line = rows[row];
+            if len(line) < col: line += " " * (col - len(line));
+            glyph = "_" if state == CursorState.NORMAL else "█";
+            if col < len(line): line = line[:col] + glyph + line[col + 1:];
+            else: line += glyph;
+            rows[row] = line;
         while len(rows) > 1 and rows[-1] == "":
             rows.pop();
         return "\n".join(rows);
@@ -157,6 +176,10 @@ class SumBasicIDE(ScriptIDE):
             self.basic_interpreter.shell_output_func = self._shell_output;
             if getattr(self.basic_interpreter.graphics, "handler", None) is None:
                 self.basic_interpreter.graphics.set_handler(SumGuiGraphicsHandler(title="sumBASIC graphics"));
+        self.basic_interpreter.text_screen = TextScreen(
+            size_provider=lambda: (max(1, int(self.output_view.page_width)), max(1, int(self.output_view.page_size))),
+            cursor_setter=self._set_run_cursor, cursor_getter=self._run_screen.cursor_state, fallback=(80,25),
+        );
         self._application_dispatch = self.app.dispatch;
         self.app.dispatch = self._dispatch_event;
         self.app.add_idle(self._poll_run_state);
@@ -167,6 +190,13 @@ class SumBasicIDE(ScriptIDE):
         super()._register_keybindings();
         self.keys.register("basic.run", "Run / Stop BASIC", ["f5", "ctrl+r"], context="editor", callback=self.toggle_run);
         return self.keys;
+
+    def _set_run_cursor(self, state):
+        state = self._run_screen.set_cursor_state(state);
+        with self._run_lock: self._run_dirty = True;
+        try: self.app.invalidate();
+        except Exception: pass;
+        return state;
 
     def _basic_output(self, text, end="\n"):
         piece = str(text) + ("" if end == "" else end);
@@ -420,7 +450,7 @@ class SumBasicIDE(ScriptIDE):
             self._run_dirty = False;
             self._shell_output_pending = False;
         if dirty:
-            rendered = self._run_screen.text();
+            rendered = self._run_screen.text(include_cursor=True);
             if rendered:
                 self.output_view.set_text(rendered);
                 self._scroll_output_end();

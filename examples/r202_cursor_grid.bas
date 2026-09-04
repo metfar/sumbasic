@@ -1,0 +1,13 @@
+# r20.2 demo: dynamic text grid and all three BASIC cursor states.
+CLS
+PRINT "Text grid: "; COLS; " x "; ROWS
+PRINT "CURSOR OFF / HIDE / FALSE => 0"
+CURSOR OFF: PRINT "query="; CURSOR
+PAUSE .25
+PRINT "CURSOR ON / NORMAL / UNDERSCORE / TRUE => -1"
+CURSOR ON: PRINT "query="; CURSOR
+PAUSE .25
+PRINT "CURSOR BLOCK => 1"
+CURSOR BLOCK: PRINT "query="; CURSOR
+PAUSE .25
+CURSOR ON

@@ -271,16 +271,16 @@ def test_complete_arithmetic_operator_family():
 def test_relational_and_logical_operators():
     from sumbasic.expressions import ExpressionEvaluator;
     expr = ExpressionEvaluator();
-    assert expr.eval('2 = 2') is True;
-    assert expr.eval('2 <> 3') is True;
-    assert expr.eval('2 < 3') is True;
-    assert expr.eval('2 <= 2') is True;
-    assert expr.eval('3 >= 2') is True;
-    assert expr.eval('3 > 2') is True;
-    assert expr.eval('NOT FALSE') is True;
-    assert expr.eval('TRUE AND FALSE') is False;
-    assert expr.eval('TRUE OR FALSE') is True;
-    assert expr.eval('TRUE XOR FALSE') is True;
+    assert expr.eval('2 = 2') == -1;
+    assert expr.eval('2 <> 3') == -1;
+    assert expr.eval('2 < 3') == -1;
+    assert expr.eval('2 <= 2') == -1;
+    assert expr.eval('3 >= 2') == -1;
+    assert expr.eval('3 > 2') == -1;
+    assert expr.eval('NOT FALSE') == -1;
+    assert expr.eval('TRUE AND FALSE') == 0;
+    assert expr.eval('TRUE OR FALSE') == -1;
+    assert expr.eval('TRUE XOR FALSE') == -1;
 
 
 def test_spectrum_and_extended_transcendental_math():
@@ -458,7 +458,10 @@ def test_retro_clock_example_loads_and_uses_time_font_data():
     assert 'DIM SHARED Font$(9, 6), Colon$(6)' in text;
     assert 'T$ = TIME$' in text;
     assert 'TIMER' in text;
-    assert 'BEEP .1, 0: PAUSE .9' in text;
+    assert 'PAUSE .05' in text;
+    assert 'CURSOR OFF' in text and 'CURSOR ON' in text;
+    assert 'PLAY ' in text and 'BACKGROUND' in text;
+    assert 'Cols! < 42' in text;
     assert ':LOOP' in text;
     assert 'A$ = INKEY$' in text;
     assert 'GOTO LOOP' in text;

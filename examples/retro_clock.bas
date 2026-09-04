@@ -1,8 +1,6 @@
-# Retro digital clock for sumBASIC.
-# TIME$ supplies HH:MM:SS. TIMER is seconds since local midnight.
-# The bitmap font is loaded once from DATA into DIM SHARED arrays.
-# The clock runs until Escape, Q or q is pressed in the IDE or --run console.
-# IDE: F5 toggles Run/Stop; F6 changes between Editor and Output.
+# Retro digital clock for sumBASIC r20.2.
+# Responsive text grid: big digits at 42+ columns, compact status otherwise.
+# Q/q/Escape exits quickly; redraw/audio happen only when time/width changes.
 
 DIM SHARED Font$(9, 6), Colon$(6)
 
@@ -16,32 +14,68 @@ FOR Row! = 0 TO 6
     READ Colon$(Row!)
 NEXT Row!
 
-:LOOP
-T$ = TIME$
+OldT$ = ""
+OldCols! = -1
+OldWide! = 99
 CLS
 
-FOR Row! = 0 TO 6
-    Line$ = ""
-    FOR Pos! = 1 TO 8
-        C$ = MID$(T$, Pos!, 1)
-        IF C$ = ":" THEN
-            Line$ = Line$ + Colon$(Row!) + " "
-        ELSE
-            Digit! = VAL(C$)
-            Line$ = Line$ + Font$(Digit!, Row!) + " "
-        END IF
-    NEXT Pos!
-    LOCATE Row! + 4, 20
-    PRINT Line$
-NEXT Row!
+:LOOP
+T$ = TIME$
+Cols! = COLS
+Wide! = Cols! >= 42
 
-LOCATE 13, 20
-PRINT "TIME$ = "; T$; "   TIMER = "; INT(TIMER)
+# Crossing the 42-column threshold changes layout; clear only once then.
+IF Wide! <> OldWide! THEN
+    CLS
+    OldWide! = Wide!
+END IF
 
-# BEEP blocks for .1 s. PAUSE uses Spectrum 50 Hz ticks, so 45 ticks
-# contribute another .9 s: approximately one update/beep per second.
-BEEP .1, 0: PAUSE .9
-A$ = INKEY$: IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
+# Seconds or viewport width changed: repaint. Otherwise only poll input.
+IF T$ <> OldT$ OR Cols! <> OldCols! THEN
+    CURSOR OFF
+
+    Status$ = "TIME$=" + T$ + " TIMER=" + STR$(INT(TIMER)) + "  Q=quit"
+
+    IF Cols! < 42 THEN
+        LOCATE 1, 1
+        PRINT SPACE$(Cols!);
+        LOCATE 1, 1
+        PRINT LEFT$(Status$, Cols!);
+    ELSE
+        x = MAX(1, INT((Cols! - 42) / 2) + 1)
+        ClearWidth! = MIN(64, Cols! - x + 1)
+
+        FOR Row! = 0 TO 6
+            Line$ = ""
+            FOR Pos! = 1 TO 8
+                C$ = MID$(T$, Pos!, 1)
+                IF C$ = ":" THEN
+                    Line$ = Line$ + Colon$(Row!) + " "
+                ELSE
+                    Digit! = VAL(C$)
+                    Line$ = Line$ + Font$(Digit!, Row!) + " "
+                END IF
+            NEXT Pos!
+            LOCATE Row! + 4, x: PRINT SPACE$(ClearWidth!);
+            LOCATE Row! + 4, x: PRINT LEFT$(Line$, ClearWidth!);
+        NEXT Row!
+
+        LOCATE 13, x: PRINT SPACE$(ClearWidth!);
+        LOCATE 13, x: PRINT LEFT$(Status$, ClearWidth!);
+    END IF
+
+    # Short non-blocking tick: audio never controls the input polling rate.
+    PLAY BACKGROUND "T480O5c"
+
+    OldT$ = T$
+    OldCols! = Cols!
+    CURSOR ON
+END IF
+
+# A 50 ms ceiling keeps Q/Escape reaction fast. PAUSE preserves the wake key.
+PAUSE .05
+A$ = INKEY$
+IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
 GOTO LOOP
 
 # 0

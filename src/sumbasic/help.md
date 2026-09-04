@@ -881,17 +881,317 @@ PRINT AT 8,9; "PRINT AT"
 LOCATE, PRINT
 
 
-### VAL / EVAL (r20)
+### VAL
 
-`VAL(text)` returns the first numeric literal found in `text`; it does not evaluate arithmetic. `EVAL(text)` evaluates the BASIC expression in the current variable environment.
+Extracts the first numeric value from arbitrary text without evaluating an expression. sumBASIC uses English numeric notation: `.` is the decimal point, `,` groups thousands, and `e`/`E` introduces a decimal exponent. An exterior `+` or `-` may appear before or immediately after the number; the first exterior sign found wins. A sign following `e`/`E` belongs to the exponent instead.
+
+#### Syntax
+
+```text
+VAL(text)
+```
+
+#### Functional example
 
 ```basic
-a=VAL("2+2")
-PRINT a
-b=EVAL("a+2")
-PRINT b
+PRINT VAL("   U -1.5p6")
+PRINT VAL("   LUN 1.5-6")
+PRINT VAL("USD 10-")
+PRINT VAL("+10-")
+PRINT VAL("1,234.5")
+PRINT VAL("45.3e-6")
+PRINT VAL("2+2")
 ```
+
+#### Notes
+
+- The examples above return `-1.5`, `-1.5`, `-10`, `10`, `1234.5`, `0.0000453`, and `2`.
+- `VAL` never evaluates arithmetic operators. Use `EVAL` when expression evaluation is intended.
+
+#### See also
+
+EVAL, STR$, HEX$, OCT$, BIN$
+
+### EVAL
+
+Evaluates a BASIC expression in the current variable environment.
+
+#### Syntax
+
+```text
+EVAL(text)
+```
+
+#### Functional example
+
+```basic
+a = 2
+PRINT EVAL("a+2")
+PRINT VAL("2+2")
+```
+
+#### See also
+
+VAL
 
 ### RDS (r20)
 
 `READRDS(path)` and `SAVERDS(path,value)` are adapters to the common `sumData` RDS layer.
+
+#### Syntax
+
+```text
+READRDS(path)
+SAVERDS(path,value)
+```
+
+#### Functional example
+
+```basic
+ok = SAVERDS("value.rds", 42)
+PRINT READRDS("value.rds")
+```
+
+#### See also
+
+VAL, EVAL
+
+## Screen planes and compatibility (r20.2)
+
+### COLS / ROWS
+
+Returns the current text-grid dimensions. The backend is queried on every access, so terminal resize, Android orientation, soft-keyboard and GUI font/cell changes are visible without restarting the program.
+
+#### Syntax
+
+```text
+COLS
+ROWS
+COLS()
+ROWS()
+```
+
+#### Functional example
+
+```basic
+PRINT "Text grid: "; COLS; "x"; ROWS
+IF COLS < 42 THEN PRINT "Compact layout"
+```
+
+#### Notes
+
+- `COLS` and `ROWS` are counts. Text cursor coordinates remain one-based for `LOCATE`.
+- The fallback is 80 columns by 25 rows only when the active backend cannot report its viewport.
+
+#### See also
+
+CURSOR, POS, CSRLIN, GWIDTH / GHEIGHT / GCOLORS
+
+### CURSOR
+
+Controls the text-grid caret independently from the graphics plane. sumBASIC keeps its classic numeric boolean representation: `FALSE=0`, `TRUE=-1`; the positive value `1` is reserved for the full block cursor. The runtime restores the previous visible cursor state when program execution finishes.
+
+#### Syntax
+
+```text
+CURSOR OFF
+CURSOR HIDE
+CURSOR FALSE
+CURSOR 0
+CURSOR ON
+CURSOR SHOW
+CURSOR NORMAL
+CURSOR UNDERSCORE
+CURSOR TRUE
+CURSOR -1
+CURSOR BLOCK
+CURSOR 1
+CURSOR
+```
+
+#### Functional example
+
+```basic
+CURSOR OFF
+PRINT "redrawing...";
+CURSOR ON
+PAUSE .05
+```
+
+#### Notes
+
+- `CURSOR` used as an expression returns `0`, `-1`, or `1`.
+- `CURSOR` never hides the mouse/touch pointer and does not affect `GPRINT`.
+
+#### See also
+
+COLS / ROWS, LOCATE, PRINT
+
+### GWIDTH / GHEIGHT / GCOLORS
+
+Returns the logical graphics-plane width, height and color capacity. These metrics are independent from the text grid.
+
+#### Syntax
+
+```text
+GWIDTH
+GHEIGHT
+GCOLORS
+```
+
+#### Functional example
+
+```basic
+DISPLAY (640,480,16,AUTO)
+PRINT "Text: "; COLS; "x"; ROWS
+PRINT "Graphics: "; GWIDTH; "x"; GHEIGHT; " colors="; GCOLORS
+```
+
+#### See also
+
+DISPLAY, COLS / ROWS, GPRINT / GPRINTF
+
+### GPRINT / GPRINTF
+
+Draws text in graphics coordinates without moving the text-grid cursor. `GPRINTF` applies C/printf-style formatting before drawing.
+
+#### Syntax
+
+```text
+GPRINT x,y,text [,color [,size [,font_family]]]
+GPRINTF x,y,format [,value ...]
+```
+
+#### Functional example
+
+```basic
+DISPLAY (640,480,16,AUTO)
+LOCATE 2,2: PRINT "TextGrid"
+GPRINT 100,50,"GraphicsSurface"
+GPRINTF 100,80,"%dx%d",GWIDTH,GHEIGHT
+```
+
+#### Notes
+
+- `PRINT`/`PRINTF` target the text grid; `GPRINT`/`GPRINTF` target the graphics plane.
+- Graphics coordinates are logical points/pixels with `(0,0)` at the graphics origin.
+
+#### See also
+
+PRINT, PRINTF, FONT, GWIDTH / GHEIGHT / GCOLORS
+
+### CLEAR LAYER
+
+Clears one built-in screen plane without resetting the others. Plain `CLS` still clears the complete composed screen and refills background/border with the currently selected `PAPER`/`BORDER` state.
+
+#### Syntax
+
+```text
+CLEAR TEXTLAYER
+CLEAR GRAPHLAYER
+CLEAR BACKGROUNDLAYER
+CLEAR BORDERLAYER
+```
+
+#### Functional example
+
+```basic
+GPRINT 20,20,"graphics"
+PRINT "text"
+CLEAR TEXTLAYER
+```
+
+#### See also
+
+CLS, SORT LAYERS, BORDER
+
+### SORT LAYERS
+
+Reorders the built-in compositor by z-index. `ASC` is the default and lists selected layers from lower to higher z-index; `DESC` accepts the same selected layers from higher to lower. A partial list is valid: unmentioned layers keep their relative order below the selected block.
+
+#### Syntax
+
+```text
+SORT LAYERS layer [,layer ...] [ASC|DESC]
+```
+
+#### Functional example
+
+```basic
+# Default: BORDER, BACKGROUND, GRAPHICS, TEXT
+SORT LAYERS GRAPHICS, TEXT
+# Still: BORDER, BACKGROUND, GRAPHICS, TEXT
+
+SORT LAYERS GRAPHICS, BORDER, TEXT
+# Becomes: BACKGROUND, GRAPHICS, BORDER, TEXT
+
+SORT LAYERS TEXT, BORDER, GRAPHICS DESC
+# Same resulting order as the previous statement
+```
+
+#### See also
+
+CLEAR LAYER, BORDER
+
+### DEF PATTERN / BORDER PATTERN
+
+Defines an 8x8 one-bit repeating tile and applies it to the BORDER plane. Set bits use `BORDER INK`; clear bits use `BORDER PAPER`. Offset and scroll alter the phase without redefining the pattern.
+
+#### Syntax
+
+```text
+DEF PATTERN id,b0,b1,b2,b3,b4,b5,b6,b7
+BORDER INK color
+BORDER PAPER color
+BORDER PATTERN id
+BORDER PATTERN OFF
+BORDER OFFSET x,y
+BORDER SCROLL dx,dy
+```
+
+#### Functional example
+
+```basic
+DEF PATTERN 1,0b11110000,0b11110000,0b00001111,0b00001111,0b11110000,0b11110000,0b00001111,0b00001111
+BORDER PAPER 1
+BORDER INK 5
+BORDER PATTERN 1
+BORDER SCROLL 1,0
+```
+
+#### See also
+
+BORDER, SORT LAYERS, CLEAR LAYER
+
+### BASIC numeric literals (r20.2)
+
+Adds modern base prefixes to sumBASIC while preserving historical spellings. This extension is specific to sumBASIC.
+
+#### Syntax
+
+```text
+&H1FF     0x1FF
+%11101    0b11101
+BIN 11101
+&O777     0o777
+```
+
+#### Functional example
+
+```basic
+PRINT &H1FF; " = "; 0x1FF
+PRINT %11101; " = "; 0b11101; " = "; BIN 11101
+PRINT &O777; " = "; 0o777
+PRINT HEX$(255,4); OCT$(255,4); BIN$(5,8)
+```
+
+#### Notes
+
+- BASIC prefixes are case-insensitive.
+- `HEX$`, `OCT$`, and `BIN$` accept an optional minimum width padded with zeroes. Decimal text continues to use `STR$`.
+
+#### See also
+
+VAL, STR$, HEX$, OCT$, BIN$
+
+<p align=center><b>- oOo -</b></p>
