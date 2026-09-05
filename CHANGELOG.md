@@ -1,3 +1,9 @@
+## 0.2.20
+
+- Added one-based `MOUSEX()` / `MOUSEY()` text-cell coordinates and latched `MOUSEBUTTON()` clicks for running BASIC programs.
+- sumIDE forwards clicks from the textual Output plane on both the terminal and Pygame frontends; direct POSIX `--run` enables SGR mouse reporting while it owns the terminal.
+- Added `examples/piano_text.bas`, a dynamically clipped, mouse/keyboard playable ASCII piano using only the existing PLAY bus.
+
 ## 0.2.19
 
 - `PLAY STOP` / `PLAY OFF` now invalidate queued music and actively interrupt the current internal music tone where the host backend permits it, so a replacement `PLAY BACKGROUND` starts cleanly.

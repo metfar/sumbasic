@@ -419,6 +419,42 @@ LOOP UNTIL UCASE$(k$) = "Q"
 
 INPUT
 
+### MOUSEX / MOUSEY / MOUSEBUTTON
+
+Returns pointer input over the current text screen. `MOUSEX()` and `MOUSEY()`
+use one-based columns and rows matching `LOCATE`. `MOUSEBUTTON()` returns `1`
+once for a pending left click and consumes it; subsequent calls return `0`
+until the next click.
+
+#### Syntax
+
+```text
+MOUSEX()
+MOUSEY()
+MOUSEBUTTON()
+```
+
+#### Functional example
+
+```basic
+DO
+    IF MOUSEBUTTON() = 1 THEN
+        PRINT "Clicked column "; MOUSEX(); " row "; MOUSEY()
+    END IF
+    PAUSE .01
+LOOP
+```
+
+#### Notes
+
+- The sumIDE TUI and GUI backends translate clicks to the same text grid.
+- Interactive POSIX `--run` uses SGR mouse reporting when supported.
+- Reading `MOUSEBUTTON()` consumes the pending click; coordinates remain available.
+
+#### See also
+
+INKEY$, LOCATE, COLS, ROWS
+
 ## Files
 
 ### OPEN

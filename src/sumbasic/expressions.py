@@ -391,7 +391,7 @@ class ExpressionEvaluator:
         segment = re.sub(r"(?<![A-Za-z0-9_])INKEY\$(?!\s*\()", "INKEY$()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])TIME\$(?!\s*\()", "TIME$()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])TIMER(?![A-Za-z0-9_$%&!]|\s*\()", "TIMER()", segment, flags=re.I);
-        for builtin in ("COLS", "ROWS", "GWIDTH", "GHEIGHT", "GCOLORS", "CURSOR"):
+        for builtin in ("COLS", "ROWS", "GWIDTH", "GHEIGHT", "GCOLORS", "CURSOR", "MOUSEX", "MOUSEY", "MOUSEBUTTON"):
             # Preserve backward compatibility with variables such as Rows.
             # A user variable shadows the bare convenience spelling; the
             # explicit ROWS()/COLS() function form always remains available.

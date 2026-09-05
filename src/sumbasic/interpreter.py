@@ -66,6 +66,10 @@ class BasicInterpreter:
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
         self._inkey_buffer = [];
+        self._pointer_lock = threading.Lock();
+        self._pointer_x = 0;
+        self._pointer_y = 0;
+        self._pointer_button = 0;
         self.shell_command_func = shell_command_func;
         self.shell_interactive_func = shell_interactive_func;
         self.shell_output_func = shell_output_func;
@@ -87,6 +91,9 @@ class BasicInterpreter:
             "DBRECNO": lambda: self._db().recno(),
             "DBRECCOUNT": lambda: self._db().reccount(),
             "INKEY$": lambda: self._read_inkey(),
+            "MOUSEX": lambda: self._mouse_x(),
+            "MOUSEY": lambda: self._mouse_y(),
+            "MOUSEBUTTON": lambda: self._mouse_button(),
             "POINT": lambda *args: self._graphics_point(*args),
             "SCREEN$": lambda *args: self._stub_function("SCREEN$", ""),
             "ATTR": lambda *args: self._stub_function("ATTR", 0),
@@ -128,6 +135,8 @@ class BasicInterpreter:
         self.data_line_index = {};
         self.option_base = 0;
         self.patterns = {};
+        with self._pointer_lock:
+            self._pointer_button = 0;
         self._resume_context = None;
         self.stopped_by_statement = False;
         self.graphics.text_mode();
@@ -416,6 +425,32 @@ class BasicInterpreter:
             key = callback();
             if key: return key;
         return self.inkey_func();
+
+    def queue_pointer(self, x, y, button=1):
+        """Publish a text-cell pointer press to the running BASIC program.
+
+        Coordinates are one-based, matching LOCATE.  Button presses are
+        latched until MOUSEBUTTON() reads them so a short click cannot be lost
+        between interpreter polling cycles.
+        """;
+        with self._pointer_lock:
+            self._pointer_x = max(0, int(x));
+            self._pointer_y = max(0, int(y));
+            if int(button) > 0:
+                self._pointer_button = int(button);
+        return True;
+
+    def _mouse_x(self):
+        with self._pointer_lock: return self._pointer_x;
+
+    def _mouse_y(self):
+        with self._pointer_lock: return self._pointer_y;
+
+    def _mouse_button(self):
+        with self._pointer_lock:
+            value = self._pointer_button;
+            self._pointer_button = 0;
+            return value;
 
     def _preserve_inkey(self, value):
         if value:

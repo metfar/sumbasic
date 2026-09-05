@@ -212,7 +212,7 @@
     {
       "name": "PLAY",
       "category": "Audio",
-      "summary": "Plays music; background sessions can be stopped/replaced explicitly.",
+      "summary": "Plays music using the BASIC music-string facilities.",
       "syntax": [
         "PLAY string-expression",
         "PLAY BACKGROUND string-expression",
@@ -222,9 +222,7 @@
         "GWPLAY string-expression"
       ],
       "example": "PLAY BACKGROUND \"T120O5cdefgabC\"\nPAUSE .25\nPLAY STOP\nPLAY BACKGROUND \"T240O4g\"",
-      "notes": [
-        "STOP and OFF are aliases on the shared music bus. They invalidate queued notes and interrupt the active internal tone where the host backend supports interruption."
-      ],
+      "notes": [],
       "see_also": [
         "BEEP",
         "SOUND"
@@ -288,6 +286,30 @@
       ],
       "see_also": [
         "INPUT"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "MOUSEX / MOUSEY / MOUSEBUTTON",
+      "category": "Console I/O",
+      "summary": "Returns pointer input over the current text screen. `MOUSEX()` and `MOUSEY()` use one-based columns and rows matching `LOCATE`. `MOUSEBUTTON()` returns `1` once for a pending left click and consumes it; subsequent calls return `0` until the next click.",
+      "syntax": [
+        "MOUSEX()",
+        "MOUSEY()",
+        "MOUSEBUTTON()"
+      ],
+      "example": "DO\n    IF MOUSEBUTTON() = 1 THEN\n        PRINT \"Clicked column \"; MOUSEX(); \" row \"; MOUSEY()\n    END IF\n    PAUSE .01\nLOOP",
+      "notes": [
+        "The sumIDE TUI and GUI backends translate clicks to the same text grid.",
+        "Interactive POSIX `--run` uses SGR mouse reporting when supported.",
+        "Reading `MOUSEBUTTON()` consumes the pending click; coordinates remain available."
+      ],
+      "see_also": [
+        "INKEY$",
+        "LOCATE",
+        "COLS",
+        "ROWS"
       ],
       "aliases": [],
       "language": "basic"

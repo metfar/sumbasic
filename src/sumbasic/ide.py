@@ -31,7 +31,7 @@ import re;
 import threading;
 
 from sumide.app import ScriptIDE;
-from sumtui.events import Key, KeyEvent;
+from sumtui.events import Key, KeyEvent, MouseEvent;
 
 from .interpreter import BasicError, BasicInterpreter;
 from .graphics import SumGuiGraphicsHandler;
@@ -231,6 +231,13 @@ class SumBasicIDE(ScriptIDE):
 
     def _dispatch_event(self, event):
         running = self._run_thread is not None and self._run_thread.is_alive();
+        if running and isinstance(event, MouseEvent) and event.button == "left" and event.action == "press":
+            translated = self.output_window._interior_event(event);
+            if translated is not None:
+                column = int(translated.x) + int(getattr(self.output_view, "x_offset", 0)) + 1;
+                row = int(translated.y) + int(getattr(self.output_view, "offset", 0)) + 1;
+                self.basic_interpreter.queue_pointer(column, row, button=1);
+                return True;
         if running and isinstance(event, KeyEvent):
             if event.key == Key.ESCAPE:
                 return self._queue_program_key(chr(27));

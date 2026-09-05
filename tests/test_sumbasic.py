@@ -1383,3 +1383,50 @@ def test_r19_program_joins_underscore_and_backslash_continuations():
     lines=program.source_lines();
     assert lines[0][1]=='PRINT "A" ; "B"';
     assert lines[1][1]=='PRINT "C" ; "D"';
+
+
+def test_text_mouse_coordinates_match_locate_and_click_is_latched_once():
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+    basic.queue_pointer(23, 7, button=1);
+    assert basic.expr.eval("MOUSEX()") == 23;
+    assert basic.expr.eval("MOUSEY()") == 7;
+    assert basic.expr.eval("MOUSEBUTTON()") == 1;
+    assert basic.expr.eval("MOUSEBUTTON()") == 0;
+
+
+def test_text_mouse_bare_function_spellings():
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+    basic.queue_pointer(11, 4, button=1);
+    assert basic.expr.eval("MOUSEX + MOUSEY") == 15;
+    assert basic.expr.eval("MOUSEBUTTON") == 1;
+
+
+def test_clickable_text_piano_checks_cleanly():
+    root = Path(__file__).resolve().parents[1] / "examples";
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+    basic.program.load_file(root / "piano_text.bas");
+    assert basic.check() is True;
+
+
+def test_clickable_text_piano_black_key_hit_uses_existing_play_bus():
+    from sumui import TextScreen;
+    output = [];
+    calls = [0];
+    basic = None;
+    def inkey():
+        calls[0] += 1;
+        if calls[0] == 1:
+            basic.queue_pointer(5, 4, button=1);
+            return "";
+        return chr(27);
+    basic = BasicInterpreter(
+        output_func=lambda text, end="\n": output.append(str(text) + end),
+        inkey_func=inkey,
+        sleep_func=lambda _seconds: None,
+        text_screen=TextScreen(size_provider=lambda: (80, 25)),
+    );
+    root = Path(__file__).resolve().parents[1] / "examples";
+    basic.program.load_file(root / "piano_text.bas");
+    basic.run();
+    basic.audio.stop_all();
+    assert "Playing C#3 with [s]" in "".join(output);

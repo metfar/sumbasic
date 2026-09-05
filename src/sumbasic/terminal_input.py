@@ -23,6 +23,7 @@ import builtins;
 import os;
 import select;
 import sys;
+import re;
 
 
 class TerminalInput:
@@ -32,7 +33,9 @@ class TerminalInput:
     see a key without Enter.  INPUT temporarily restores the normal terminal
     mode, preserving ordinary line editing and echo.
     """
-    def __init__(self, stream=None):
+    _SGR_MOUSE_RE = re.compile(br"^\x1b\[<(\d+);(\d+);(\d+)([Mm])$");
+
+    def __init__(self, stream=None, pointer_callback=None):
         self.stream = stream if stream is not None else sys.stdin;
         self.fd = None;
         self.enabled = False;
@@ -40,6 +43,8 @@ class TerminalInput:
         self._saved_attributes = None;
         self._termios = None;
         self._tty = None;
+        self.pointer_callback = pointer_callback;
+        self._mouse_reporting = False;
         try:
             self.fd = self.stream.fileno();
             self.enabled = bool(self.stream.isatty());
@@ -55,6 +60,7 @@ class TerminalInput:
             self._tty = tty;
             self._saved_attributes = termios.tcgetattr(self.fd);
             tty.setcbreak(self.fd);
+            self._enable_mouse();
         return self;
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -62,6 +68,7 @@ class TerminalInput:
         return False;
 
     def restore(self):
+        self._disable_mouse();
         if self.enabled and not self._windows and self._saved_attributes is not None:
             try:
                 self._termios.tcsetattr(self.fd, self._termios.TCSADRAIN, self._saved_attributes);
@@ -72,8 +79,23 @@ class TerminalInput:
         if self.enabled and not self._windows and self._tty is not None:
             try:
                 self._tty.setcbreak(self.fd);
+                self._enable_mouse();
             except (OSError, ValueError):
                 pass;
+
+    def _enable_mouse(self):
+        if self.enabled and not self._windows and self.fd is not None and not self._mouse_reporting:
+            try:
+                os.write(self.fd, b"\x1b[?1000h\x1b[?1006h");
+                self._mouse_reporting = True;
+            except (OSError, ValueError):
+                self._mouse_reporting = False;
+
+    def _disable_mouse(self):
+        if self._mouse_reporting and self.fd is not None:
+            try: os.write(self.fd, b"\x1b[?1006l\x1b[?1000l");
+            except (OSError, ValueError): pass;
+        self._mouse_reporting = False;
 
     def input(self, prompt=""):
         if not self.enabled or self._windows:
@@ -133,6 +155,19 @@ class TerminalInput:
             tail = self._read_posix_bytes(0.015);
             if tail:
                 data += tail;
+        if data.startswith(b"\x1b[<"):
+            while not data.endswith((b"M", b"m")) and len(data) < 64:
+                tail = self._read_posix_bytes(0.002, maximum=64 - len(data));
+                if not tail: break;
+                data += tail;
+            match = self._SGR_MOUSE_RE.match(data);
+            if match:
+                code, x, y, ending = match.groups();
+                code = int(code);
+                button = 1 if (code & 3) == 0 and ending == b"M" else 0;
+                if button and callable(self.pointer_callback):
+                    self.pointer_callback(int(x), int(y), button);
+                return "";
         return self._decode_key(data);
 
     def _read_windows(self):

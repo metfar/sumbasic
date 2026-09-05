@@ -74,6 +74,7 @@ def _run_loaded(interpreter, interactive_terminal=False):
     try:
         if interactive_terminal:
             with TerminalInput() as terminal:
+                terminal.pointer_callback = interpreter.queue_pointer;
                 interpreter.input_func = terminal.input;
                 interpreter.inkey_func = terminal.inkey;
                 interpreter.shell_interactive_func = lambda: terminal.run_external(run_interactive_shell);

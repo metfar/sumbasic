@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.19
+Version: 0.2.20
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -580,5 +580,24 @@ Examples include `bgi_style_smile.bas`, `display_pages.bas`, `console_positions.
 ## Shared chart renderers
 
 `CHART` lowers to the same `sumUI.ChartSpec` used by Python. The native SumGUI renderer is the default; Matplotlib and Seaborn are optional ChartSpec renderers (`sumbasic[charts]`). Named CHART syntax accepts `\` or `_` line continuation.
+
+## Text-cell mouse input
+
+`MOUSEX()` and `MOUSEY()` return one-based text-cell coordinates matching
+`LOCATE row,column`. `MOUSEBUTTON()` returns a pending left click as `1` and
+consumes it, returning `0` until the next click. Clicks work in the textual
+Output plane of both sumIDE backends. Interactive POSIX `--run` also enables
+SGR mouse reporting when the terminal supports it.
+
+```basic
+IF MOUSEBUTTON() = 1 THEN
+    PRINT MOUSEX(); ","; MOUSEY()
+END IF
+```
+
+`examples/piano_text.bas` draws as many keys as fit in the current text
+viewport and accepts both mouse clicks and the 29-key chromatic mapping
+`zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
+the existing `PLAY BACKGROUND` / `PLAY STOP` implementation.
 
 <p align=center><b>- oOo -</b></p>
