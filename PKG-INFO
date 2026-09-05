@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.20
+Version: 0.2.21
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -11,16 +11,16 @@ Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: sumui>=0.1.0a13
-Requires-Dist: sumtui>=0.8.0a12
+Requires-Dist: sumtui>=0.8.0a13
 Requires-Dist: sumide>=0.2.17
 Requires-Dist: sumx>=0.2.17
 Requires-Dist: sumdata>=0.1.0a1
 Requires-Dist: sumplot>=0.1.0a1
 Requires-Dist: rich>=13.0
 Provides-Extra: graphics
-Requires-Dist: sumgui>=0.2.0a16; extra == "graphics"
+Requires-Dist: sumgui>=0.2.0a18; extra == "graphics"
 Provides-Extra: charts
-Requires-Dist: sumgui[charts]>=0.2.0a16; extra == "charts"
+Requires-Dist: sumgui[charts]>=0.2.0a18; extra == "charts"
 Dynamic: license-file
 
 # sumBASIC 0.2.1
@@ -598,6 +598,8 @@ END IF
 `examples/piano_text.bas` draws as many keys as fit in the current text
 viewport and accepts both mouse clicks and the 29-key chromatic mapping
 `zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
-the existing `PLAY BACKGROUND` / `PLAY STOP` implementation.
+the existing PLAY synthesizer. `PLAY HOLD 3, note$` sustains a note, renews its
+three-second safety timeout without retriggering on keyboard repeat, and stops
+immediately on graphical `KEYUP$` or mouse/touch release.
 
 <p align=center><b>- oOo -</b></p>

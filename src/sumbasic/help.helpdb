@@ -216,16 +216,18 @@
       "syntax": [
         "PLAY string-expression",
         "PLAY BACKGROUND string-expression",
+        "PLAY HOLD [timeout,] string-expression",
         "PLAY STOP",
         "PLAY OFF",
         "ZXPLAY string-expression",
         "GWPLAY string-expression"
       ],
-      "example": "PLAY BACKGROUND \"T120O5cdefgabC\"\nPAUSE .25\nPLAY STOP\nPLAY BACKGROUND \"T240O4g\"",
+      "example": "PLAY BACKGROUND \"T120O5cdefgabC\"\nPAUSE .25\nPLAY STOP\nPLAY BACKGROUND \"T240O4g\"\nPLAY HOLD 3, \"T240V15O4c\"",
       "notes": [],
       "see_also": [
         "BEEP",
-        "SOUND"
+        "SOUND",
+        "KEYUP$"
       ],
       "aliases": [],
       "language": "basic"
@@ -291,9 +293,25 @@
       "language": "basic"
     },
     {
+      "name": "KEYUP$",
+      "category": "Console I/O",
+      "summary": "Returns a released key in graphical backends, or an empty string. Terminal keyboards generally cannot report releases; use a safety timeout there.",
+      "syntax": [
+        "KEYUP$"
+      ],
+      "example": "",
+      "notes": [],
+      "see_also": [
+        "INKEY$",
+        "PLAY"
+      ],
+      "aliases": [],
+      "language": "text"
+    },
+    {
       "name": "MOUSEX / MOUSEY / MOUSEBUTTON",
       "category": "Console I/O",
-      "summary": "Returns pointer input over the current text screen. `MOUSEX()` and `MOUSEY()` use one-based columns and rows matching `LOCATE`. `MOUSEBUTTON()` returns `1` once for a pending left click and consumes it; subsequent calls return `0` until the next click.",
+      "summary": "Returns pointer input over the current text screen. `MOUSEX()` and `MOUSEY()` use one-based columns and rows matching `LOCATE`. `MOUSEBUTTON()` returns `1` while the primary pointer is held and `0` after release.",
       "syntax": [
         "MOUSEX()",
         "MOUSEY()",
@@ -303,7 +321,7 @@
       "notes": [
         "The sumIDE TUI and GUI backends translate clicks to the same text grid.",
         "Interactive POSIX `--run` uses SGR mouse reporting when supported.",
-        "Reading `MOUSEBUTTON()` consumes the pending click; coordinates remain available."
+        "Mouse and touch releases are forwarded so held controls can stop immediately."
       ],
       "see_also": [
         "INKEY$",

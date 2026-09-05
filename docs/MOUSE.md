@@ -2,8 +2,9 @@
 
 `MOUSEX()` and `MOUSEY()` expose the last pointer position as one-based text
 cells, using the same coordinate convention as `LOCATE row,column`.
-`MOUSEBUTTON()` returns `1` once for a pending left click and consumes that
-click. A later call returns `0` until another press arrives.
+`MOUSEBUTTON()` returns the current primary-button state: `1` while it is held
+and `0` after release. This permits controls such as piano keys to remain active
+for the complete mouse or touch gesture.
 
 ```basic
 DO

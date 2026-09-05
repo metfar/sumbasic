@@ -68,6 +68,21 @@ ZXPLAY BACKGROUND A$, B$, C$
 
 `PLAY STOP` and `PLAY OFF` (likewise `ZXPLAY` / `GWPLAY`) cancel the current music session immediately where the host audio backend supports interruption, invalidate queued notes, and allow the next background phrase to start cleanly. `STOP` and `OFF` are aliases.
 
+### Held notes
+
+`PLAY HOLD` sustains exactly one note on the existing PLAY bus:
+
+```basic
+PLAY HOLD "T240V15O4c"
+PLAY HOLD 3, "T240V15O4c"
+PLAY STOP
+```
+
+The default safety timeout is three seconds. Repeating the identical command
+renews that timeout without restarting the tone, so keyboard auto-repeat can
+keep it alive smoothly. A timeout of zero disables the safety limit when the
+input backend guarantees a release event. `PLAY STOP` releases it immediately.
+
 ## GW-BASIC PLAY
 
 `GWPLAY` implements the classic Microsoft music-macro spelling separately:

@@ -54,7 +54,7 @@ class _BasicStop(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None, text_screen=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None, text_screen=None, keyup_func=None):
         self.program = BasicProgram();
         self.variables = {};
         self.variable_types = {};
@@ -66,6 +66,8 @@ class BasicInterpreter:
         self.output_func = output_func;
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
         self._inkey_buffer = [];
+        self.keyup_func = keyup_func if keyup_func is not None else (lambda: "");
+        self._keyup_buffer = [];
         self._pointer_lock = threading.Lock();
         self._pointer_x = 0;
         self._pointer_y = 0;
@@ -91,6 +93,7 @@ class BasicInterpreter:
             "DBRECNO": lambda: self._db().recno(),
             "DBRECCOUNT": lambda: self._db().reccount(),
             "INKEY$": lambda: self._read_inkey(),
+            "KEYUP$": lambda: self._read_keyup(),
             "MOUSEX": lambda: self._mouse_x(),
             "MOUSEY": lambda: self._mouse_y(),
             "MOUSEBUTTON": lambda: self._mouse_button(),
@@ -426,18 +429,24 @@ class BasicInterpreter:
             if key: return key;
         return self.inkey_func();
 
-    def queue_pointer(self, x, y, button=1):
-        """Publish a text-cell pointer press to the running BASIC program.
+    def _read_keyup(self):
+        if self._keyup_buffer: return self._keyup_buffer.pop(0);
+        return self.keyup_func();
 
-        Coordinates are one-based, matching LOCATE.  Button presses are
-        latched until MOUSEBUTTON() reads them so a short click cannot be lost
-        between interpreter polling cycles.
+    def queue_keyup(self, value):
+        if value: self._keyup_buffer.append(str(value));
+        return True;
+
+    def queue_pointer(self, x, y, button=1):
+        """Publish the current text-cell pointer state to BASIC.
+
+        Coordinates are one-based, matching LOCATE.  Button is 1 while the
+        primary pointer is held and 0 after release.
         """;
         with self._pointer_lock:
             self._pointer_x = max(0, int(x));
             self._pointer_y = max(0, int(y));
-            if int(button) > 0:
-                self._pointer_button = int(button);
+            self._pointer_button = max(0, int(button));
         return True;
 
     def _mouse_x(self):
@@ -447,10 +456,7 @@ class BasicInterpreter:
         with self._pointer_lock: return self._pointer_y;
 
     def _mouse_button(self):
-        with self._pointer_lock:
-            value = self._pointer_button;
-            self._pointer_button = 0;
-            return value;
+        with self._pointer_lock: return self._pointer_button;
 
     def _preserve_inkey(self, value):
         if value:
@@ -542,7 +548,7 @@ class BasicInterpreter:
                 command, body = re.match(r"^(PLAY|ZXPLAY|GWPLAY)\s+(.+)$", text, re.I).groups();
                 body = body.strip();
                 if body.upper() not in ("OFF", "STOP"):
-                    mode_match = re.match(r"^(FOREGROUND|BACKGROUND)\b\s*(.*)$", body, re.I);
+                    mode_match = re.match(r"^(FOREGROUND|BACKGROUND|HOLD)\b\s*(.*)$", body, re.I);
                     if mode_match: body = mode_match.group(2).strip();
                     args = self._split_top_level(body, separators=",", keep_empty=False);
                     limit = 3 if command.upper() in ("PLAY", "ZXPLAY") else 1;
@@ -1156,7 +1162,7 @@ class BasicInterpreter:
             if body.upper() in ("OFF", "STOP"):
                 self.audio.stop_music(); return pc + 1;
             mode = None;
-            mode_match = re.match(r"^(FOREGROUND|BACKGROUND)\b\s*(.*)$", body, re.I);
+            mode_match = re.match(r"^(FOREGROUND|BACKGROUND|HOLD)\b\s*(.*)$", body, re.I);
             if mode_match:
                 mode = mode_match.group(1).upper();
                 body = mode_match.group(2).strip();
@@ -1164,8 +1170,17 @@ class BasicInterpreter:
             try:
                 if command in ("PLAY", "ZXPLAY"):
                     if not 1 <= len(args) <= 3: raise BasicError("{} requires one to three music strings".format(command));
-                    strings = [str(self.expr.eval(arg)) for arg in args];
-                    self.audio.zxplay(strings, background=(mode == "BACKGROUND"));
+                    if mode == "HOLD":
+                        if len(args) == 1:
+                            timeout, source = 3.0, str(self.expr.eval(args[0]));
+                        elif len(args) == 2:
+                            timeout, source = float(self.expr.eval(args[0])), str(self.expr.eval(args[1]));
+                        else:
+                            raise BasicError("PLAY HOLD requires [timeout,] one music string");
+                        self.audio.zxplay_hold(source, timeout=timeout);
+                    else:
+                        strings = [str(self.expr.eval(arg)) for arg in args];
+                        self.audio.zxplay(strings, background=(mode == "BACKGROUND"));
                 else:
                     if len(args) != 1: raise BasicError("GWPLAY requires one music string");
                     self.audio.gwplay(str(self.expr.eval(args[0])), mode=mode);

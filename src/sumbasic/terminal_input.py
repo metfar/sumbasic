@@ -165,7 +165,7 @@ class TerminalInput:
                 code, x, y, ending = match.groups();
                 code = int(code);
                 button = 1 if (code & 3) == 0 and ending == b"M" else 0;
-                if button and callable(self.pointer_callback):
+                if callable(self.pointer_callback):
                     self.pointer_callback(int(x), int(y), button);
                 return "";
         return self._decode_key(data);

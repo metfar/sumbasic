@@ -19,6 +19,10 @@ from .shell import run_interactive_shell;
 from .terminal_input import TerminalInput;
 
 
+def _stdout_output(text="", end="\n"):
+    print(str(text), end=end, flush=True);
+
+
 def _plain_repl(interpreter):
     print("sumBASIC {} - Ready.".format(__version__));
     while True:
@@ -128,7 +132,7 @@ def main(argv=None):
     if args.file and args.run and ui_backend == "gui" and not _source_uses_graphics(args.file): return _edit_file(args.file, backend="gui", run=True);
     if not args.file and args.command is None and not args.run and not args.check and not args.plain and (ui_backend == "gui" or bool(getattr(sys.stdin, "isatty", lambda: False)())):
         return _edit_file(None, backend=ui_backend);
-    interpreter = BasicInterpreter(graphics_handler=SumGuiGraphicsHandler(), text_screen=TerminalTextScreen());
+    interpreter = BasicInterpreter(output_func=_stdout_output, graphics_handler=SumGuiGraphicsHandler(), text_screen=TerminalTextScreen());
     if args.command is not None:
         interpreter.program.load_text(str(args.command) + ("" if str(args.command).endswith("\n") else "\n"));
         if args.check: return _check_loaded(interpreter, "command");

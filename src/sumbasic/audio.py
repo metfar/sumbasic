@@ -86,6 +86,8 @@ class SystemTonePlayer:
         self._active_cancel_event = None;
         self._active_process = None;
         self._active_lock = threading.Lock();
+        self._hold_channel = None;
+        self._hold_process = None;
 
     def _ensure_worker(self):
         with self._worker_lock:
@@ -109,7 +111,41 @@ class SystemTonePlayer:
                 if process.poll() is None: process.terminate();
             except Exception:
                 pass;
+        channel = self._hold_channel;
+        self._hold_channel = None;
+        if channel is not None:
+            try: channel.stop();
+            except Exception: pass;
+        hold_process = self._hold_process;
+        self._hold_process = None;
+        if hold_process is not None:
+            try:
+                if hold_process.poll() is None: hold_process.terminate();
+            except Exception: pass;
         return None;
+
+    def hold(self, frequency, volume=1.0):
+        """Start one cancellable continuous sine on the existing tone backend.""";
+        self.stop();
+        try:
+            import pygame;
+            if not pygame.mixer.get_init(): pygame.mixer.init(frequency=self.sample_rate, size=-16, channels=1);
+            sound = pygame.mixer.Sound(file=io.BytesIO(self._wav_bytes(frequency, 1.0, volume)));
+            self._hold_channel = sound.play(loops=-1);
+            return True;
+        except Exception:
+            pass;
+        player = shutil.which("play");
+        if player:
+            try:
+                self._hold_process = subprocess.Popen(
+                    [player, "-q", "-v", "{:.4f}".format(volume), "-n", "synth", "sine", "{:.6f}".format(float(frequency))],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                );
+                return True;
+            except OSError:
+                self._hold_process = None;
+        return False;
 
     def play(self, frequency, duration, blocking=True, volume=1.0):
         frequency = float(frequency);
@@ -496,6 +532,9 @@ class MusicEngine:
         self._generation_lock = threading.Lock();
         self._channel_players = [SystemTonePlayer(), SystemTonePlayer(), SystemTonePlayer()];
         self.output_volume = 1.0;
+        self._hold_lock = threading.Lock();
+        self._hold_signature = None;
+        self._hold_timer = None;
 
     def _ensure_worker(self):
         with self._worker_lock:
@@ -509,6 +548,11 @@ class MusicEngine:
     def stop(self):
         with self._generation_lock: self._generation += 1;
         for player in self._channel_players: player.stop();
+        with self._hold_lock:
+            self._hold_signature = None;
+            timer = self._hold_timer;
+            self._hold_timer = None;
+        if timer is not None: timer.cancel();
         stopper = getattr(self.tone_func, "stop", None) if self.tone_func is not None else None;
         if callable(stopper):
             try: stopper();
@@ -537,6 +581,37 @@ class MusicEngine:
             if index == 0: tempo = parsed_tempo;
             tracks.append(events);
         return self._enqueue(tracks, bool(background));
+
+    def hold_zx(self, source, timeout=3.0):
+        """Hold one ZX note; identical calls only renew the safety timeout.""";
+        events, unused_tempo = self.zx_parser.parse(source);
+        pitched = [event for event in events if event.frequency is not None];
+        if len(pitched) != 1: raise MusicParseError("PLAY HOLD requires exactly one note");
+        event = pitched[0];
+        signature = (str(source), float(event.frequency), float(event.volume));
+        timeout = max(0.0, float(timeout));
+        with self._hold_lock:
+            same = signature == self._hold_signature;
+            old_timer = self._hold_timer;
+            if old_timer is not None: old_timer.cancel();
+            if not same:
+                for player in self._channel_players: player.stop();
+                self._channel_players[0].hold(event.frequency, event.volume * self.output_volume);
+                self._hold_signature = signature;
+            if timeout > 0.0:
+                expected = signature;
+                def expire():
+                    with self._hold_lock:
+                        if self._hold_signature != expected: return;
+                        self._hold_signature = None;
+                        self._hold_timer = None;
+                    self._channel_players[0].stop();
+                self._hold_timer = threading.Timer(timeout, expire);
+                self._hold_timer.daemon = True;
+                self._hold_timer.start();
+            else:
+                self._hold_timer = None;
+        return True;
 
     def play_gw(self, source, mode=None):
         events, requested_mode = self.gw_parser.parse(source);
@@ -623,6 +698,9 @@ class AudioEngine:
 
     def zxplay(self, strings, background=False):
         return self.music.play_zx(strings, background=background);
+
+    def zxplay_hold(self, source, timeout=3.0):
+        return self.music.hold_zx(source, timeout=timeout);
 
     def gwplay(self, source, mode=None):
         return self.music.play_gw(source, mode=mode);

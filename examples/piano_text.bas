@@ -9,6 +9,7 @@ FOR I! = 0 TO 28
 NEXT I!
 
 VOLUME PLAY 25
+HoldTimeout! = 3
 CLS
 CURSOR OFF
 
@@ -17,7 +18,7 @@ Top! = 3
 WhiteWidth! = 4
 VisibleWhites! = MIN(17, MAX(1, INT((COLS - Left!) / WhiteWidth!)))
 
-PRINT "sumBASIC piano: keyboard/mouse | SPACE=stop | ESC=exit"
+PRINT "sumBASIC piano: hold keyboard/mouse | SPACE=stop | ESC=exit"
 PRINT "Click a key or press: zsxdcvgbhnjm q2w3er5t6y7u i9o0p"
 
 # Draw the white keys first.
@@ -50,6 +51,7 @@ NEXT I!
 
 DO
     K$ = LCASE$(INKEY$)
+    Released$ = LCASE$(KEYUP$)
     Selected! = -1
 
     # Physical keyboard lookup.
@@ -85,16 +87,37 @@ DO
     END IF
 
     IF Selected! >= 0 THEN
-        PLAY STOP
-        PLAY BACKGROUND "T240V15" + Note$(Selected!)
-        LOCATE 2, 1
-        PRINT SPACE$(COLS);
-        LOCATE 2, 1
-        PRINT "Playing "; Name$(Selected!); " with ["; Key$(Selected!); "]";
+        NewHeld$ = Key$(Selected!)
+        PLAY HOLD HoldTimeout!, "T240V15" + Note$(Selected!)
+        IF Held$ <> NewHeld$ THEN
+            Held$ = NewHeld$
+            IF Button! = 1 THEN HeldSource$ = "mouse" ELSE HeldSource$ = "keyboard"
+            LOCATE 2, 1
+            PRINT SPACE$(COLS);
+            LOCATE 2, 1
+            PRINT "Playing "; Name$(Selected!); " with ["; Key$(Selected!); "]";
+        END IF
     END IF
+
+    # sumGUI supplies exact KEYUP; a terminal keyboard uses the timeout.
+    IF Released$ <> "" AND Released$ = Held$ AND HeldSource$ = "keyboard" THEN
+        PLAY STOP
+        Held$ = ""
+        HeldSource$ = ""
+    END IF
+
+    # Mouse/touch supplies an exact release in both GUI and SGR terminals.
+    IF MouseWasDown! = 1 AND Button! = 0 AND HeldSource$ = "mouse" THEN
+        PLAY STOP
+        Held$ = ""
+        HeldSource$ = ""
+    END IF
+    MouseWasDown! = Button!
 
     IF K$ = " " THEN
         PLAY STOP
+        Held$ = ""
+        HeldSource$ = ""
         LOCATE 2, 1: PRINT SPACE$(COLS);
         LOCATE 2, 1: PRINT "Stopped.";
     END IF

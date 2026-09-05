@@ -149,6 +149,7 @@ class SumBasicIDE(ScriptIDE):
         self._run_error = None;
         self._run_lock = threading.Lock();
         self._inkey_queue = queue.Queue();
+        self._keyup_queue = queue.Queue();
         self._direct_basic_thread = None;
         self._direct_basic_output_buffer = "";
         self._direct_basic_finished = False;
@@ -165,6 +166,7 @@ class SumBasicIDE(ScriptIDE):
                 input_func=self._ide_input,
                 output_func=self._basic_output,
                 inkey_func=self._ide_inkey,
+                keyup_func=self._ide_keyup,
                 shell_interactive_func=self._interactive_shell,
                 shell_output_func=self._shell_output,
                 graphics_handler=SumGuiGraphicsHandler(title="sumBASIC graphics"),
@@ -172,6 +174,7 @@ class SumBasicIDE(ScriptIDE):
         else:
             self.basic_interpreter.output_func = self._basic_output;
             self.basic_interpreter.inkey_func = self._ide_inkey;
+            self.basic_interpreter.keyup_func = self._ide_keyup;
             self.basic_interpreter.shell_interactive_func = self._interactive_shell;
             self.basic_interpreter.shell_output_func = self._shell_output;
             if getattr(self.basic_interpreter.graphics, "handler", None) is None:
@@ -224,6 +227,12 @@ class SumBasicIDE(ScriptIDE):
         except queue.Empty:
             return "";
 
+    def _ide_keyup(self):
+        try:
+            return self._keyup_queue.get_nowait();
+        except queue.Empty:
+            return "";
+
     def _queue_program_key(self, value):
         if value:
             self._inkey_queue.put(str(value));
@@ -231,14 +240,20 @@ class SumBasicIDE(ScriptIDE):
 
     def _dispatch_event(self, event):
         running = self._run_thread is not None and self._run_thread.is_alive();
-        if running and isinstance(event, MouseEvent) and event.button == "left" and event.action == "press":
+        if running and isinstance(event, MouseEvent) and event.button == "left" and event.action in ("press", "release", "move"):
             translated = self.output_window._interior_event(event);
             if translated is not None:
                 column = int(translated.x) + int(getattr(self.output_view, "x_offset", 0)) + 1;
                 row = int(translated.y) + int(getattr(self.output_view, "offset", 0)) + 1;
-                self.basic_interpreter.queue_pointer(column, row, button=1);
+                self.basic_interpreter.queue_pointer(column, row, button=0 if event.action == "release" else 1);
                 return True;
         if running and isinstance(event, KeyEvent):
+            if getattr(event, "action", "press") == "release":
+                if event.key == Key.ESCAPE: return self.basic_interpreter.queue_keyup(chr(27));
+                if event.key == Key.SPACE: return self.basic_interpreter.queue_keyup(" ");
+                if event.text and not event.ctrl and not event.alt: return self.basic_interpreter.queue_keyup(event.text);
+                if len(str(event.key)) == 1 and not event.ctrl and not event.alt: return self.basic_interpreter.queue_keyup(str(event.key));
+                return True;
             if event.key == Key.ESCAPE:
                 return self._queue_program_key(chr(27));
             if event.text and not event.ctrl and not event.alt:
@@ -251,6 +266,11 @@ class SumBasicIDE(ScriptIDE):
         while True:
             try:
                 self._inkey_queue.get_nowait();
+            except queue.Empty:
+                break;
+        while True:
+            try:
+                self._keyup_queue.get_nowait();
             except queue.Empty:
                 break;
         with self._run_lock:

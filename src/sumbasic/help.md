@@ -309,6 +309,7 @@ Plays music using the BASIC music-string facilities.
 ```text
 PLAY string-expression
 PLAY BACKGROUND string-expression
+PLAY HOLD [timeout,] string-expression
 PLAY STOP
 PLAY OFF
 ZXPLAY string-expression
@@ -322,11 +323,12 @@ PLAY BACKGROUND "T120O5cdefgabC"
 PAUSE .25
 PLAY STOP
 PLAY BACKGROUND "T240O4g"
+PLAY HOLD 3, "T240V15O4c"
 ```
 
 #### See also
 
-BEEP, SOUND
+BEEP, SOUND, KEYUP$
 
 ## Environment
 
@@ -419,12 +421,26 @@ LOOP UNTIL UCASE$(k$) = "Q"
 
 INPUT
 
+### KEYUP$
+
+Returns a released key in graphical backends, or an empty string. Terminal
+keyboards generally cannot report releases; use a safety timeout there.
+
+#### Syntax
+
+```text
+KEYUP$
+```
+
+#### See also
+
+INKEY$, PLAY
+
 ### MOUSEX / MOUSEY / MOUSEBUTTON
 
 Returns pointer input over the current text screen. `MOUSEX()` and `MOUSEY()`
 use one-based columns and rows matching `LOCATE`. `MOUSEBUTTON()` returns `1`
-once for a pending left click and consumes it; subsequent calls return `0`
-until the next click.
+while the primary pointer is held and `0` after release.
 
 #### Syntax
 
@@ -449,7 +465,7 @@ LOOP
 
 - The sumIDE TUI and GUI backends translate clicks to the same text grid.
 - Interactive POSIX `--run` uses SGR mouse reporting when supported.
-- Reading `MOUSEBUTTON()` consumes the pending click; coordinates remain available.
+- Mouse and touch releases are forwarded so held controls can stop immediately.
 
 #### See also
 

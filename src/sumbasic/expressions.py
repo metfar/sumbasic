@@ -388,7 +388,7 @@ class ExpressionEvaluator:
         segment = re.sub(r"\\", "//", segment);
         segment = re.sub(r"\bDB\.(RECNO|RECCOUNT)\s*\(", lambda m: "DB" + m.group(1).upper() + "(", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])RND(?!\s*\()", "RND()", segment, flags=re.I);
-        segment = re.sub(r"(?<![A-Za-z0-9_])INKEY\$(?!\s*\()", "INKEY$()", segment, flags=re.I);
+        segment = re.sub(r"(?<![A-Za-z0-9_])(INKEY\$|KEYUP\$)(?!\s*\()", lambda match: match.group(1) + "()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])TIME\$(?!\s*\()", "TIME$()", segment, flags=re.I);
         segment = re.sub(r"(?<![A-Za-z0-9_])TIMER(?![A-Za-z0-9_$%&!]|\s*\()", "TIMER()", segment, flags=re.I);
         for builtin in ("COLS", "ROWS", "GWIDTH", "GHEIGHT", "GCOLORS", "CURSOR", "MOUSEX", "MOUSEY", "MOUSEBUTTON"):

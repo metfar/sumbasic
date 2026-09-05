@@ -1,3 +1,9 @@
+## 0.2.21
+
+- Added `PLAY HOLD [timeout,] note$`: repeated identical requests renew the configurable safety timeout without retriggering the existing PLAY tone.
+- Added `KEYUP$` for graphical keyboard releases and made `MOUSEBUTTON()` report held/released pointer state.
+- Fixed immediate drawing for direct text programs by flushing CLI output, and updated `piano_text.bas` for sustained keyboard, mouse and touch notes.
+
 ## 0.2.20
 
 - Added one-based `MOUSEX()` / `MOUSEY()` text-cell coordinates and latched `MOUSEBUTTON()` clicks for running BASIC programs.

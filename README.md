@@ -573,6 +573,8 @@ END IF
 `examples/piano_text.bas` draws as many keys as fit in the current text
 viewport and accepts both mouse clicks and the 29-key chromatic mapping
 `zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
-the existing `PLAY BACKGROUND` / `PLAY STOP` implementation.
+the existing PLAY synthesizer. `PLAY HOLD 3, note$` sustains a note, renews its
+three-second safety timeout without retriggering on keyboard repeat, and stops
+immediately on graphical `KEYUP$` or mouse/touch release.
 
 <p align=center><b>- oOo -</b></p>
