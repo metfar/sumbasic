@@ -169,11 +169,15 @@ class SumGuiGraphicsHandler:
             from sumgui.graphics import GraphicsWindow;
         except (ImportError, ModuleNotFoundError) as exc:
             raise GraphicsBackendError("sumBASIC graphics require sumGUI/Pygame; install the graphics extra with: pip install 'sumbasic[graphics]'") from exc;
-        self.window = GraphicsWindow(title=self.title, fit_display=self.fit_display);
+        self.window = GraphicsWindow(title=self.title, fit_display=self.fit_display, close_on_escape=False);
         return self.window;
 
     def __call__(self, item):
         return self._ensure_window().handle(item);
+
+    def inkey(self):
+        if self.window is None: return "";
+        return self.window.read_key();
 
     def finish(self, wait=False):
         if self.window is None:

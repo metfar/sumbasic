@@ -65,7 +65,7 @@ IF T$ <> OldT$ OR Cols! <> OldCols! THEN
     END IF
 
     # Short non-blocking tick: audio never controls the input polling rate.
-    PLAY BACKGROUND "T480O5c"
+    PLAY BACKGROUND "T240O5c"
 
     OldT$ = T$
     OldCols! = Cols!

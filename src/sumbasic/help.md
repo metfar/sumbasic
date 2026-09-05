@@ -1141,6 +1141,7 @@ Defines an 8x8 one-bit repeating tile and applies it to the BORDER plane. Set bi
 
 ```text
 DEF PATTERN id,b0,b1,b2,b3,b4,b5,b6,b7
+BORDER WIDTH pixels
 BORDER INK color
 BORDER PAPER color
 BORDER PATTERN id

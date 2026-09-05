@@ -411,6 +411,10 @@ class BasicInterpreter:
     def _read_inkey(self):
         if self._inkey_buffer:
             return self._inkey_buffer.pop(0);
+        callback = getattr(getattr(self.graphics, "handler", None), "inkey", None);
+        if callable(callback):
+            key = callback();
+            if key: return key;
         return self.inkey_func();
 
     def _preserve_inkey(self, value):
@@ -1054,6 +1058,8 @@ class BasicInterpreter:
             if seconds < 0: raise BasicError("PAUSE requires a non-negative number of seconds");
             interrupted = self.graphics.pause(seconds);
             if interrupted is not None:
+                if interrupted:
+                    self._preserve_inkey(self._read_inkey());
                 self._stop_if_requested();
                 return pc + 1;
             started = time.monotonic();
@@ -1348,6 +1354,11 @@ class BasicInterpreter:
             if len(parts) > 5: options["font_name"] = str(self.expr.eval(parts[5]));
             self.graphics.emit("text", (x, y, value), **options);
             return True;
+        match = re.match(r"^BORDER\s+WIDTH\s+(.+)$", raw, re.I);
+        if match:
+            width = int(self.expr.eval(match.group(1)));
+            if width < 0: raise BasicError("BORDER WIDTH must be non-negative");
+            self.graphics.emit("border_width", (width,)); return True;
         match = re.match(r"^BORDER\s+INK\s+(.+)$", raw, re.I);
         if match:
             self.graphics.emit("border_ink", (self.expr.eval(match.group(1)),)); return True;

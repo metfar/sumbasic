@@ -108,3 +108,16 @@ def test_cls_uses_current_paper_without_resetting_border_pattern():
     clear = [item for item in commands if item.operation == "clear"][-1];
     assert dict(clear.options)["color"] == 4;
     assert any(item.operation == "clear_layer" and item.arguments == ("BORDER",) for item in commands);
+
+
+def test_r2021_border_width_and_graphics_pause_preserves_key():
+    class Handler:
+        def __init__(self): self.commands=[]; self.key="q";
+        def __call__(self,item): self.commands.append(item);
+        def pause(self,seconds): return True;
+        def inkey(self): key,self.key=self.key,""; return key;
+    handler=Handler(); basic=BasicInterpreter(graphics_handler=handler);
+    basic.execute_immediate("BORDER WIDTH 24");
+    assert any(getattr(item,"operation",None)=="border_width" and item.arguments==(24,) for item in handler.commands);
+    basic.program.load_text('PAUSE .05\nK$ = INKEY$\nEND\n'); basic.run();
+    assert basic.variables["k$"] == "q";
