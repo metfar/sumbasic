@@ -79,3 +79,16 @@ A short-lived command-line invocation waits for queued SOUND/music after normal 
 The default backend uses Windows `winsound` where available, then common POSIX audio tools, with generated WAV/terminal-bell fallback. Music volume is honored by backends that expose amplitude control.
 
 <p align=center><b>- oOo -<b></p>
+
+### Stopping/replacing background music
+
+`PLAY STOP` and `PLAY OFF` stop the shared music bus, discard queued notes from the previous session, and are intended to be used before starting a replacement background phrase. The explicit dialect names accept the same forms: `ZXPLAY STOP`, `GWPLAY STOP`, `ZXPLAY OFF`, and `GWPLAY OFF`.
+
+```basic
+PLAY BACKGROUND "T120O5cdefgabC"
+PAUSE .25
+PLAY STOP
+PLAY BACKGROUND "T240O4g"
+```
+
+<p align=center><b>- oOo -</b></p>

@@ -308,6 +308,9 @@ Plays music using the BASIC music-string facilities.
 
 ```text
 PLAY string-expression
+PLAY BACKGROUND string-expression
+PLAY STOP
+PLAY OFF
 ZXPLAY string-expression
 GWPLAY string-expression
 ```
@@ -315,7 +318,10 @@ GWPLAY string-expression
 #### Functional example
 
 ```basic
-PLAY "C D E F G"
+PLAY BACKGROUND "T120O5cdefgabC"
+PAUSE .25
+PLAY STOP
+PLAY BACKGROUND "T240O4g"
 ```
 
 #### See also

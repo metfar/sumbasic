@@ -556,4 +556,4 @@ Examples include `bgi_style_smile.bas`, `display_pages.bas`, `console_positions.
 
 `CHART` lowers to the same `sumUI.ChartSpec` used by Python. The native SumGUI renderer is the default; Matplotlib and Seaborn are optional ChartSpec renderers (`sumbasic[charts]`). Named CHART syntax accepts `\` or `_` line continuation.
 
-<p align=center><b>- oOo -<b></p>
+<p align=center><b>- oOo -</b></p>

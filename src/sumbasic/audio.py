@@ -81,6 +81,11 @@ class SystemTonePlayer:
         self._tone_queue = queue.Queue();
         self._worker = None;
         self._worker_lock = threading.Lock();
+        self._generation = 0;
+        self._generation_lock = threading.Lock();
+        self._active_cancel_event = None;
+        self._active_process = None;
+        self._active_lock = threading.Lock();
 
     def _ensure_worker(self):
         with self._worker_lock:
@@ -88,6 +93,23 @@ class SystemTonePlayer:
                 self._worker = threading.Thread(target=self._worker_loop, name="sumBASIC-tone", daemon=True);
                 self._worker.start();
         return self._worker;
+
+    def _current_generation(self):
+        with self._generation_lock: return self._generation;
+
+    def stop(self):
+        # Cancel the currently sounding tone and invalidate queued requests.
+        with self._generation_lock: self._generation += 1;
+        with self._active_lock:
+            cancel_event = self._active_cancel_event;
+            process = self._active_process;
+        if cancel_event is not None: cancel_event.set();
+        if process is not None:
+            try:
+                if process.poll() is None: process.terminate();
+            except Exception:
+                pass;
+        return None;
 
     def play(self, frequency, duration, blocking=True, volume=1.0):
         frequency = float(frequency);
@@ -97,8 +119,10 @@ class SystemTonePlayer:
             return None;
         completed = threading.Event() if blocking else None;
         result = [];
+        generation = self._current_generation();
+        cancel_event = threading.Event();
         self._ensure_worker();
-        self._tone_queue.put((frequency, duration, volume, completed, result));
+        self._tone_queue.put((generation, cancel_event, frequency, duration, volume, completed, result));
         if completed is not None:
             completed.wait();
             return result[0] if result else False;
@@ -110,15 +134,26 @@ class SystemTonePlayer:
 
     def _worker_loop(self):
         while True:
-            frequency, duration, volume, completed, result = self._tone_queue.get();
+            generation, cancel_event, frequency, duration, volume, completed, result = self._tone_queue.get();
             try:
+                if generation != self._current_generation():
+                    result.append(False);
+                    continue;
+                with self._active_lock: self._active_cancel_event = cancel_event;
+                if generation != self._current_generation() or cancel_event.is_set():
+                    result.append(False);
+                    continue;
                 try:
-                    result.append(self._play_blocking(frequency, duration, volume));
-                except TypeError:
-                    result.append(self._play_blocking(frequency, duration));
-            except Exception:
-                result.append(False);
+                    try:
+                        result.append(self._play_blocking(frequency, duration, volume));
+                    except TypeError:
+                        result.append(self._play_blocking(frequency, duration));
+                except Exception:
+                    result.append(False);
             finally:
+                with self._active_lock:
+                    if self._active_cancel_event is cancel_event: self._active_cancel_event = None;
+                    self._active_process = None;
                 if completed is not None:
                     completed.set();
                 self._tone_queue.task_done();
@@ -134,24 +169,38 @@ class SystemTonePlayer:
         player = shutil.which("play");
         if player:
             try:
-                subprocess.run([player, "-q", "-v", "{:.4f}".format(volume), "-n", "synth", "{:.6f}".format(duration), "sine", "{:.6f}".format(frequency)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
-                return True;
+                process = subprocess.Popen([player, "-q", "-v", "{:.4f}".format(volume), "-n", "synth", "{:.6f}".format(duration), "sine", "{:.6f}".format(frequency)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
+                with self._active_lock: self._active_process = process;
+                process.wait();
+                return process.returncode == 0;
             except OSError:
                 pass;
+            finally:
+                with self._active_lock:
+                    if self._active_process is locals().get("process"): self._active_process = None;
         aplay = shutil.which("aplay");
         if aplay:
             try:
                 payload = self._wav_bytes(frequency, duration, volume);
-                subprocess.run([aplay, "-q", "-"], input=payload, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
-                return True;
+                process = subprocess.Popen([aplay, "-q", "-"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL);
+                with self._active_lock: self._active_process = process;
+                process.communicate(payload);
+                return process.returncode == 0;
             except OSError:
                 pass;
+            finally:
+                with self._active_lock:
+                    if self._active_process is locals().get("process"): self._active_process = None;
         try:
             sys.stdout.write("\a");
             sys.stdout.flush();
         except Exception:
             pass;
-        time.sleep(duration);
+        with self._active_lock: cancel_event = self._active_cancel_event;
+        if cancel_event is None:
+            time.sleep(duration);
+        else:
+            cancel_event.wait(duration);
         return False;
 
     def _wav_bytes(self, frequency, duration, volume=1.0):
@@ -459,6 +508,11 @@ class MusicEngine:
 
     def stop(self):
         with self._generation_lock: self._generation += 1;
+        for player in self._channel_players: player.stop();
+        stopper = getattr(self.tone_func, "stop", None) if self.tone_func is not None else None;
+        if callable(stopper):
+            try: stopper();
+            except Exception: pass;
         return None;
 
     def set_output_volume(self, volume):

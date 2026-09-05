@@ -212,14 +212,19 @@
     {
       "name": "PLAY",
       "category": "Audio",
-      "summary": "Plays music using the BASIC music-string facilities.",
+      "summary": "Plays music; background sessions can be stopped/replaced explicitly.",
       "syntax": [
         "PLAY string-expression",
+        "PLAY BACKGROUND string-expression",
+        "PLAY STOP",
+        "PLAY OFF",
         "ZXPLAY string-expression",
         "GWPLAY string-expression"
       ],
-      "example": "PLAY \"C D E F G\"",
-      "notes": [],
+      "example": "PLAY BACKGROUND \"T120O5cdefgabC\"\nPAUSE .25\nPLAY STOP\nPLAY BACKGROUND \"T240O4g\"",
+      "notes": [
+        "STOP and OFF are aliases on the shared music bus. They invalidate queued notes and interrupt the active internal tone where the host backend supports interruption."
+      ],
       "see_also": [
         "BEEP",
         "SOUND"

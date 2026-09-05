@@ -53,6 +53,10 @@ sumBASIC also provides an explicit background extension:
 ```basic
 PLAY BACKGROUND "T180O5N3cdefg"
 PRINT "This appears immediately"
+
+# Replace background music without allowing the old queue to continue.
+PLAY STOP
+PLAY BACKGROUND "T240O5c"
 ```
 
 The same spelling works with the explicit name:
@@ -62,7 +66,7 @@ ZXPLAY FOREGROUND A$, B$, C$
 ZXPLAY BACKGROUND A$, B$, C$
 ```
 
-`PLAY OFF` or `ZXPLAY OFF` cancels future music events from the current music session.
+`PLAY STOP` and `PLAY OFF` (likewise `ZXPLAY` / `GWPLAY`) cancel the current music session immediately where the host audio backend supports interruption, invalidate queued notes, and allow the next background phrase to start cleanly. `STOP` and `OFF` are aliases.
 
 ## GW-BASIC PLAY
 
@@ -110,4 +114,4 @@ PRINT "music continues"
 
 `STOP` suspends BASIC without discarding background music. An IDE user-abort requests audio cancellation; a normal command-line run waits for queued background sound/music before the short-lived `sumbasic` process exits.
 
-<p align=center><b>- oOo -<b></p>
+<p align=center><b>- oOo -</b></p>

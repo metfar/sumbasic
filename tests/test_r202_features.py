@@ -142,3 +142,38 @@ def test_r2022_audio_bus_volume_scales_beep_sound_and_play():
     assert basic.audio.get_volume("BEEP") == 0.1;
     assert basic.audio.get_volume("SOUND") == 0.1;
     assert basic.audio.get_volume("PLAY") == 0.1;
+
+
+def test_r2023_play_stop_interrupts_current_system_tone_and_replacement_starts_promptly(monkeypatch):
+    import io;
+    import time;
+    import sumbasic.audio as audio_module;
+    from sumbasic.audio import SystemTonePlayer;
+    monkeypatch.setattr(audio_module.shutil, "which", lambda _name: None);
+    monkeypatch.setattr(audio_module.sys, "stdout", io.StringIO());
+    player = SystemTonePlayer();
+    started = time.monotonic();
+    player.play(440, .8, False);
+    time.sleep(.05);
+    player.stop();
+    player.play(660, .02, False);
+    player.wait_for_background();
+    assert time.monotonic() - started < .4;
+
+
+def test_r2023_play_stop_statement_is_accepted_before_background_replacement():
+    import threading;
+    import time;
+    calls = [];
+    gate = threading.Event();
+    class Tone:
+        def __call__(self, frequency, duration, blocking, volume=1.0):
+            calls.append((frequency, duration, blocking, volume));
+            gate.wait(.2);
+        def stop(self):
+            gate.set();
+    basic = BasicInterpreter(output_func=lambda *a, **k: None, tone_func=Tone());
+    basic.program.load_text('PLAY BACKGROUND "T240O5c"\nPAUSE .01\nPLAY STOP\nPLAY BACKGROUND "T240O5d"\nEND\n');
+    basic.run();
+    basic.audio.wait_for_background();
+    assert len(calls) >= 1;

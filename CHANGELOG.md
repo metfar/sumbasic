@@ -1,3 +1,9 @@
+## 0.2.19
+
+- `PLAY STOP` / `PLAY OFF` now invalidate queued music and actively interrupt the current internal music tone where the host backend permits it, so a replacement `PLAY BACKGROUND` starts cleanly.
+- Updated `retro_clock.bas` to stop the previous tick before starting the next one and to persist `OldRows!`, preventing accidental 50 ms redraw/audio loops after a viewport-height change.
+- Added `examples/r2023_play_stop.bas`.
+
 # r20 coordinated release
 
 - Aligned with SUM r20 architecture and package versions.
@@ -311,3 +317,5 @@
 - Added initial text I/O, expressions, control flow, DATA/READ, loops and classic BASIC functions.
 - Added sumTUI command window and sumedit integration.
 - Graphics, virtual hardware and SumIR intentionally deferred to subsequent milestones.
+
+<p align=center><b>- oOo -</b></p>

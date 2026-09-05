@@ -1,4 +1,4 @@
-# Retro digital clock for sumBASIC r20.2.
+# Retro digital clock for sumBASIC r20.2.3.
 # Responsive text grid: big digits at 42+ columns, compact status otherwise.
 # Q/q/Escape exits quickly; redraw/audio happen only when time/width changes.
 
@@ -15,6 +15,7 @@ FOR Row! = 0 TO 6
 NEXT Row!
 
 OldT$ = ""
+OldRows! = -1
 OldCols! = -1
 OldWide! = 99
 VOLUME PLAY 25
@@ -23,6 +24,7 @@ CLS
 :LOOP
 T$ = TIME$
 Cols! = COLS
+Rows! = ROWS
 Wide! = Cols! >= 42
 
 # Crossing the 42-column threshold changes layout; clear only once then.
@@ -32,12 +34,12 @@ IF Wide! <> OldWide! THEN
 END IF
 
 # Seconds or viewport width changed: repaint. Otherwise only poll input.
-IF T$ <> OldT$ OR Cols! <> OldCols! THEN
+IF T$ <> OldT$ OR Cols! <> OldCols! OR Rows! <> OldRows! THEN
     CURSOR OFF
-
+    IF Cols! <> OldCols! OR Rows! <> OldRows! THEN CLS
     Status$ = "TIME$=" + T$ + " TIMER=" + STR$(INT(TIMER)) + "  Q=quit"
 
-    IF Cols! < 42 THEN
+    IF Cols! < 42 OR Rows! < 13 THEN
         LOCATE 1, 1
         PRINT SPACE$(Cols!);
         LOCATE 1, 1
@@ -65,11 +67,13 @@ IF T$ <> OldT$ OR Cols! <> OldCols! THEN
         LOCATE 13, x: PRINT LEFT$(Status$, ClearWidth!);
     END IF
 
-    # Short non-blocking tick: audio never controls the input polling rate.
-    PLAY BACKGROUND "T240O5c"
+    # Replace any previous background phrase before starting this tick.
+    PLAY STOP
+    PLAY BACKGROUND "T240O1c"
 
     OldT$ = T$
     OldCols! = Cols!
+    OldRows! = Rows!
     CURSOR ON
 END IF
 
@@ -77,6 +81,7 @@ END IF
 PAUSE .05
 A$ = INKEY$
 IF A$ = CHR$(27) OR A$ = "Q" OR A$ = "q" THEN END
+IF A$ = "C" OR A$ = "c" THEN CLS
 GOTO LOOP
 
 # 0
