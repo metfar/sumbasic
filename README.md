@@ -583,7 +583,7 @@ IF MOUSEBUTTON() = 1 THEN
 END IF
 ```
 
-`examples/piano_text.bas` draws as many keys as fit in the current text
+`examples/piano_text.bas` (still working on this) draws as many keys as fit in the current text
 viewport and accepts both mouse clicks and the 29-key chromatic mapping
 `zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
 the existing PLAY synthesizer. `PLAY HOLD 3, note$` sustains a note, renews its
