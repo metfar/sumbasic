@@ -332,6 +332,43 @@ BEEP, SOUND, KEYUP$
 
 ## Environment
 
+### COMMAND LINE ARGUMENTS
+
+Arguments written after the `.bas` filename are passed to the program instead of being parsed as sumBASIC options. Put runtime options such as `--gui` and `--run` before the filename.
+
+#### Syntax
+
+```text
+COMMAND$       normalized command tail as one string
+ARGS$          alias of COMMAND$
+ARGC           number of argument tokens
+ARGV$(index)   zero-based token array
+ARGS$(index)   alias of ARGV$(index)
+```
+
+#### Notes
+
+- `COMMAND$` follows the classic BASIC command-tail idea.
+- The array form preserves argument boundaries even when an argument contains spaces.
+- `ARGV$(0)` / `ARGS$(0)` is the first token after the BASIC filename, not the filename itself.
+- When `ARGC=0`, no argument array elements exist.
+
+#### Functional example
+
+```basic
+PRINT "Command: "; COMMAND$
+PRINT "Count: "; ARGC
+FOR I = 0 TO ARGC - 1
+    PRINT I; ": "; ARGV$(I)
+NEXT I
+```
+
+For example, invoke it as `sumbasic --run program.bas --octava 5 "two words"`.
+
+#### See also
+
+SHELL, SYSTEM
+
 ### SHELL
 
 Runs a host shell command or opens an interactive shell when used without a command.

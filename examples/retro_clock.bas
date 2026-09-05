@@ -1,4 +1,4 @@
-# Retro digital clock for sumBASIC r20.2.3.
+# Retro digital clock for sumBASIC r21.1.
 # Responsive text grid: big digits at 42+ columns, compact status otherwise.
 # Q/q/Escape exits quickly; redraw/audio happen only when time/width changes.
 
@@ -13,6 +13,20 @@ NEXT Digit!
 FOR Row! = 0 TO 6
     READ Colon$(Row!)
 NEXT Row!
+
+# Command-line tail example:
+#   sumbasic --run retro_clock.bas --octava 5
+Octave! = 2
+IF ARGC > 0 THEN
+    FOR ArgI! = 0 TO ARGC - 1
+        Arg$ = LCASE$(ARGV$(ArgI!))
+        IF (Arg$ = "--octava" OR Arg$ = "--octave" OR Arg$ = "-o") AND ArgI! + 1 < ARGC THEN
+            Octave! = INT(VAL(ARGV$(ArgI! + 1)))
+        END IF
+    NEXT ArgI!
+END IF
+Octave! = MAX(0, MIN(6, Octave!))
+Tick$ = "T240O" + STR$(Octave!) + "c"
 
 OldT$ = ""
 OldRows! = -1
@@ -37,7 +51,7 @@ END IF
 IF T$ <> OldT$ OR Cols! <> OldCols! OR Rows! <> OldRows! THEN
     CURSOR OFF
     IF Cols! <> OldCols! OR Rows! <> OldRows! THEN CLS
-    Status$ = "TIME$=" + T$ + " TIMER=" + STR$(INT(TIMER)) + "  Q=quit"
+    Status$ = "TIME$=" + T$ + " TIMER=" + STR$(INT(TIMER)) + " O=" + STR$(Octave!) + "  Q=quit"
 
     IF Cols! < 42 OR Rows! < 13 THEN
         LOCATE 1, 1
@@ -69,7 +83,7 @@ IF T$ <> OldT$ OR Cols! <> OldCols! OR Rows! <> OldRows! THEN
 
     # Replace any previous background phrase before starting this tick.
     PLAY STOP
-    PLAY BACKGROUND "T240O1c"
+    PLAY BACKGROUND Tick$
 
     OldT$ = T$
     OldCols! = Cols!

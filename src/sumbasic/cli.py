@@ -51,13 +51,16 @@ def _source_uses_graphics(path):
     pattern=re.compile(r"^\s*(?:DISPLAY\b|SCREEN\s+(?!0(?:\s|$))|PLOT\b|CIRCLE\b|RECTANGLE\b|ARC\b|ELLIPSE\b|PAINT\b|FILL\b|CHART\b|TABLE\b|OUTTEXTXY\b|BSAVE\s+.+,\s*SCREEN\b)",re.I|re.M);
     return bool(pattern.search(source));
 
-def _edit_file(path=None, backend="tui", run=False):
+def _edit_file(path=None, backend="tui", run=False, program_args=None):
     from sumide.app import main_basic;
     argv = [] if path is None else [str(path)];
     if run:
         argv.insert(0, "--run");
     if backend == "gui":
         argv.insert(0, "--gui");
+    tail = [str(item) for item in (program_args or [])];
+    if tail:
+        argv.extend(["--"] + tail);
     return int(main_basic(argv) or 0);
 
 
@@ -109,6 +112,7 @@ def _check_loaded(interpreter, label):
 def build_parser():
     parser = argparse.ArgumentParser(prog="sumbasic", description="Educational console BASIC for the Sum ecosystem.");
     parser.add_argument("file", nargs="?", help="BASIC source file; opens in the sumBASIC IDE unless --run/--check is used");
+    parser.add_argument("program_args", nargs=argparse.REMAINDER, help="arguments after FILE passed to COMMAND$/ARGS$/ARGV$() inside BASIC");
     parser.add_argument("-c", "--command", dest="command", help="execute BASIC source supplied directly on the command line");
     parser.add_argument("--run", action="store_true", help="run a BASIC program");
     parser.add_argument("--check", action="store_true", help="validate program structure and recognized statements without running it");
@@ -128,11 +132,17 @@ def main(argv=None):
         print("sumBASIC {}".format(__version__)); return 0;
     if args.file and args.command is not None:
         parser.error("a source file and --command/-c cannot be used together");
+    if args.program_args and not (args.file and args.run):
+        parser.error("arguments after FILE require --run; put sumBASIC options before the filename");
     if args.file and not (args.run or args.check): return _edit_file(args.file, backend=ui_backend);
-    if args.file and args.run and ui_backend == "gui" and not _source_uses_graphics(args.file): return _edit_file(args.file, backend="gui", run=True);
+    if args.file and args.run and ui_backend == "gui" and not _source_uses_graphics(args.file):
+        if args.program_args:
+            return _edit_file(args.file, backend="gui", run=True, program_args=args.program_args);
+        return _edit_file(args.file, backend="gui", run=True);
     if not args.file and args.command is None and not args.run and not args.check and not args.plain and (ui_backend == "gui" or bool(getattr(sys.stdin, "isatty", lambda: False)())):
         return _edit_file(None, backend=ui_backend);
     interpreter = BasicInterpreter(output_func=_stdout_output, graphics_handler=SumGuiGraphicsHandler(), text_screen=TerminalTextScreen());
+    interpreter.set_program_args(args.program_args if args.file else []);
     if args.command is not None:
         interpreter.program.load_text(str(args.command) + ("" if str(args.command).endswith("\n") else "\n"));
         if args.check: return _check_loaded(interpreter, "command");

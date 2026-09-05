@@ -218,6 +218,10 @@ class SumBasicIDE(ScriptIDE):
     def _interactive_shell(self):
         return self.app.run_external(run_interactive_shell);
 
+    def set_program_args(self, args):
+        """Publish command-tail arguments to COMMAND$/ARGS$/ARGV$().""";
+        return self.basic_interpreter.set_program_args(args);
+
     def _ide_input(self, prompt=""):
         raise BasicError("Interactive INPUT from the source IDE is not implemented yet; run this program in the sumBASIC console for interactive input");
 

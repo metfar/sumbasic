@@ -1432,3 +1432,32 @@ def test_clickable_text_piano_black_key_hit_uses_existing_play_bus():
     basic.run();
     basic.audio.stop_all();
     assert "Playing C#3 with [s]" in "".join(output);
+
+
+def test_r211_command_tail_exposes_string_count_and_zero_based_arrays():
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+    basic.set_program_args(["--octava", "5", "two words"]);
+    basic.program.load_text('A$=COMMAND$\nB$=ARGS$\nC=ARGC\nD$=ARGV$(0)\nE$=ARGS$(2)\n');
+    values = basic.run();
+    assert values["argc"] == 3;
+    assert values["a$"] == "--octava 5 'two words'";
+    assert values["b$"] == values["a$"];
+    assert values["c"] == 3;
+    assert values["d$"] == "--octava";
+    assert values["e$"] == "two words";
+
+
+def test_r211_cli_treats_everything_after_bas_filename_as_program_args():
+    from sumbasic.cli import build_parser;
+    args = build_parser().parse_args(["--run", "retro_clock.bas", "--octava", "5", "two words"]);
+    assert args.run is True;
+    assert args.file == "retro_clock.bas";
+    assert args.program_args == ["--octava", "5", "two words"];
+
+
+def test_r211_command_args_and_retro_clock_examples_check_cleanly():
+    root = Path(__file__).resolve().parents[1] / "examples";
+    for name in ("r211_command_args.bas", "retro_clock.bas", "piano_text.bas"):
+        basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
+        basic.program.load_file(root / name);
+        assert basic.check() is True;

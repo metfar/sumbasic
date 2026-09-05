@@ -20,6 +20,7 @@
 #  MA 02110-1301, USA.
 #  
 import re;
+import shlex;
 import shutil;
 import threading;
 import time;
@@ -56,6 +57,8 @@ class _BasicStop(Exception):
 class BasicInterpreter:
     def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None, text_screen=None, keyup_func=None):
         self.program = BasicProgram();
+        self.program_args = [];
+        self.program_command = "";
         self.variables = {};
         self.variable_types = {};
         self.arrays = {};
@@ -124,6 +127,34 @@ class BasicInterpreter:
         self.stopped_by_statement = False;
         self.graphics.reset();
         self._resume_context = None;
+
+    def set_program_args(self, args):
+        """Set command-line arguments visible to the next BASIC run.
+
+        ``COMMAND$`` and scalar ``ARGS$`` expose a normalized command-tail
+        string. ``ARGC`` is the number of tokens. ``ARGV$()`` and ``ARGS$()``
+        are zero-based string arrays containing the exact tokens after the BAS
+        filename.  The scalar/array ARGS$ pair deliberately mirrors classic
+        BASIC's ability to distinguish a scalar from its parenthesized array.
+        """;
+        self.program_args = [str(item) for item in (args or [])];
+        self.program_command = shlex.join(self.program_args);
+        self._install_program_args();
+        return tuple(self.program_args);
+
+    def _install_program_args(self):
+        count = len(self.program_args);
+        self.expr.set("ARGC", count);
+        self.expr.set("COMMAND$", self.program_command);
+        self.expr.set("ARGS$", self.program_command);
+        self.arrays.pop("argv$", None);
+        self.arrays.pop("args$", None);
+        if count:
+            array = BasicArray("ARGV$", [(0, count - 1)], type_name="STRING", shared=True);
+            for index, value in enumerate(self.program_args): array.set([index], value);
+            self.arrays["argv$"] = array;
+            self.arrays["args$"] = array;
+        return count;
 
     def reset_runtime(self):
         self.channels.close_all();
@@ -594,6 +625,7 @@ class BasicInterpreter:
         self.stopped_by_statement = False;
         self._resume_context = None;
         self.reset_runtime();
+        self._install_program_args();
         execution, line_to_pc = self._build_execution();
         self._scan_data(execution);
         context = (

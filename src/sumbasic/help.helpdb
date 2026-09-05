@@ -233,6 +233,33 @@
       "language": "basic"
     },
     {
+      "name": "COMMAND LINE ARGUMENTS",
+      "category": "Environment",
+      "summary": "Arguments written after the `.bas` filename are passed to the program instead of being parsed as sumBASIC options. Put runtime options such as `--gui` and `--run` before the filename.",
+      "syntax": [
+        "COMMAND$       normalized command tail as one string",
+        "ARGS$          alias of COMMAND$",
+        "ARGC           number of argument tokens",
+        "ARGV$(index)   zero-based token array",
+        "ARGS$(index)   alias of ARGV$(index)"
+      ],
+      "example": "PRINT \"Command: \"; COMMAND$\nPRINT \"Count: \"; ARGC\nFOR I = 0 TO ARGC - 1\n    PRINT I; \": \"; ARGV$(I)\nNEXT I",
+      "notes": [
+        "`COMMAND$` follows the classic BASIC command-tail idea.",
+        "The array form preserves argument boundaries even when an argument contains spaces.",
+        "`ARGV$(0)` / `ARGS$(0)` is the first token after the BASIC filename",
+        "not the filename itself.",
+        "When `ARGC=0`",
+        "no argument array elements exist."
+      ],
+      "see_also": [
+        "SHELL",
+        "SYSTEM"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
       "name": "SHELL",
       "category": "Environment",
       "summary": "Runs a host shell command or opens an interactive shell when used without a command.",
