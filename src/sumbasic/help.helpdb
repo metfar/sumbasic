@@ -299,14 +299,14 @@
       "syntax": [
         "KEYUP$"
       ],
-      "example": "",
+      "example": "K$ = KEYUP$\nIF K$ <> \"\" THEN PRINT \"Released: \"; K$",
       "notes": [],
       "see_also": [
         "INKEY$",
         "PLAY"
       ],
       "aliases": [],
-      "language": "text"
+      "language": "basic"
     },
     {
       "name": "MOUSEX / MOUSEY / MOUSEBUTTON",

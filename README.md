@@ -514,6 +514,19 @@ sumbasic
 sumbasic --gui
 ```
 
+`sumCore` owns the common audio engine and installs the shell-native commands:
+
+```bash
+sumbeep 0.25 12
+sumsound 440 18.2
+sumplay 'T180O5cdefgabC'
+sumplay --hold --timeout 3 'T240V15O4c'
+```
+
+They preserve the corresponding sumBASIC units and accept `--volume 0..100`.
+See `docs/AUDIO.md` for multiple PLAY voices, GW-BASIC MML, held notes and the
+known Android terminal-bell/vibration fallback.
+
 Graphical mode presents the same sumBASIC/sumIDE application rather than launching a second BASIC IDE. Syntax highlighting, Code/Output/Command windows, menus, help, preferences, keyboard and mouse behavior remain shared. BASIC `SCREEN` graphics are still language graphics output; `--gui` controls the application/IDE presentation.
 
 

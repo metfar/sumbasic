@@ -1,3 +1,18 @@
+## 0.2.24
+
+- Moved the audio implementation and shell commands to sumCore 0.1.0a4; retained `sumbasic.audio` and `sumbasic.audio_cli` as compatible re-export modules.
+
+## 0.2.23
+
+- Added `sumbeep`, `sumsound`, and `sumplay` shell commands over the same `AudioEngine` and historical units used by sumBASIC.
+- Added ZX multivoice, GW-BASIC MML, volume, held-note timeout and signal-safe CLI handling.
+- Made `AudioEngine.stop_all()` cancel BEEP and SOUND as well as PLAY, and documented Android's current bell/vibration fallback.
+
+## 0.2.22
+
+- Keep the held PLAY sample alive until `PLAY STOP`, fixing silent `PLAY HOLD` on SDL_mixer/Pygame builds that release an unreferenced `Sound`.
+- Suppress backend import banners and warnings so initializing held audio cannot corrupt the BASIC text screen.
+
 ## 0.2.21
 
 - Added `PLAY HOLD [timeout,] note$`: repeated identical requests renew the configurable safety timeout without retriggering the existing PLAY tone.

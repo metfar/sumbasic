@@ -147,7 +147,7 @@ def test_r2022_audio_bus_volume_scales_beep_sound_and_play():
 def test_r2023_play_stop_interrupts_current_system_tone_and_replacement_starts_promptly(monkeypatch):
     import io;
     import time;
-    import sumbasic.audio as audio_module;
+    import sumcore.audio as audio_module;
     from sumbasic.audio import SystemTonePlayer;
     monkeypatch.setattr(audio_module.shutil, "which", lambda _name: None);
     monkeypatch.setattr(audio_module.sys, "stdout", io.StringIO());

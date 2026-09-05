@@ -19,22 +19,9 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 #  
-#
-#import warnings;
-#warnings.filterwarnings("ignore", category=UserWarning);
 
-"""Compatibility imports for audio moved to sumCore.""";
+"""Compatibility entry points for the commands now owned by sumCore.""";
 
-from sumcore.audio import (
-    AudioEngine, GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ,
-    GW_BASIC_TICKS_PER_SECOND, GWPlayParser, MIDDLE_C_HZ, MusicEngine,
-    MusicEvent, MusicParseError, SystemTonePlayer, ZXPlayParser,
-    gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency,
-);
+from sumcore.audio_cli import main_beep, main_play, main_sound;
 
-__all__ = [
-    "AudioEngine", "GW_BASIC_SOUND_MAX_HZ", "GW_BASIC_SOUND_MIN_HZ",
-    "GW_BASIC_TICKS_PER_SECOND", "GWPlayParser", "MIDDLE_C_HZ", "MusicEngine",
-    "MusicEvent", "MusicParseError", "SystemTonePlayer", "ZXPlayParser",
-    "gw_ticks_to_seconds", "spectrum_frequency_pitch", "spectrum_pitch_frequency",
-];
+__all__ = ["main_beep", "main_play", "main_sound"];

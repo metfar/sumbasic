@@ -432,6 +432,13 @@ keyboards generally cannot report releases; use a safety timeout there.
 KEYUP$
 ```
 
+#### Functional example
+
+```basic
+K$ = KEYUP$
+IF K$ <> "" THEN PRINT "Released: "; K$
+```
+
 #### See also
 
 INKEY$, PLAY

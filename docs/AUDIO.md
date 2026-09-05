@@ -1,6 +1,6 @@
 # Sound in sumBASIC
 
-sumBASIC keeps historical command semantics visible while sharing low-level tone synthesis.
+sumBASIC keeps historical command semantics visible while using the common `sumCore` audio engine. `sumbasic.audio` remains a compatibility re-export; the implementation, ZX/GW parsers and shell commands live in `sumcore`.
 
 ## ZX Spectrum `BEEP`
 
@@ -77,6 +77,41 @@ A background PLAY therefore continues while BASIC executes a BEEP or queues SOUN
 A short-lived command-line invocation waits for queued SOUND/music after normal program completion so the final phrase is not truncated. `STOP` suspends BASIC state without discarding background music. A frontend user-abort requests music cancellation.
 
 The default backend uses Windows `winsound` where available, then common POSIX audio tools, with generated WAV/terminal-bell fallback. Music volume is honored by backends that expose amplitude control.
+
+## Shell commands
+
+The same `AudioEngine` is available directly from Bash:
+
+```bash
+sumbeep 0.25 12
+sumsound 440 18.2
+sumplay 'T180O5cdefgabC'
+sumplay 'O4c' 'O3g'
+sumplay --gw 'T180 O4 L8 CDEFG'
+sumplay --hold --timeout 3 'T240V15O4c'
+```
+
+`sumbeep` keeps the BASIC order `duration pitch`; `sumsound` keeps `frequency
+ticks`. All three accept `--volume 0..100`. Shell quoting is strongly advised,
+especially because `#` in a PLAY string has meaning to both ZX music and the
+shell.
+
+`sumplay --hold` uses a three-second safety timeout. Set another duration with
+`--timeout`, while `--timeout 0` runs until interrupted. `Ctrl+C`, `TERM`, or
+normal process control should be used for Bash background jobs.
+
+```bash
+sumplay --hold --timeout 0 'O4c' &
+sum_audio_pid=$!
+sleep 1
+kill "$sum_audio_pid"
+wait "$sum_audio_pid" || test $? -eq 130
+```
+
+On Android, absence of a usable PCM backend may make the terminal-bell fallback
+vibrate instead of producing audio. That is a backend limitation, not PLAY,
+BEEP, SOUND, or music-string semantics; native Android/Pygame audio remains a
+separate portability task.
 
 <p align=center><b>- oOo -<b></p>
 

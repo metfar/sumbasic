@@ -1391,6 +1391,8 @@ def test_text_mouse_coordinates_match_locate_and_click_is_latched_once():
     assert basic.expr.eval("MOUSEX()") == 23;
     assert basic.expr.eval("MOUSEY()") == 7;
     assert basic.expr.eval("MOUSEBUTTON()") == 1;
+    assert basic.expr.eval("MOUSEBUTTON()") == 1;
+    basic.queue_pointer(23, 7, button=0);
     assert basic.expr.eval("MOUSEBUTTON()") == 0;
 
 
