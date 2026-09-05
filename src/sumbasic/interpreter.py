@@ -498,7 +498,7 @@ class BasicInterpreter:
             r'^NEXT(?:\s+[A-Za-z_][A-Za-z0-9_]*[$%&!]?)?$', r'^WHILE\s+.+$',
             r'^DO(?:\s+(?:WHILE|UNTIL)\s+.+)?$', r'^LOOP(?:\s+(?:WHILE|UNTIL)\s+.+)?$',
             r'^READ\s+.+$', r'^RESTORE(?:\s+.+)?$', r'^SWAP\s+.+?,\s*.+$',
-            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$', r'^SHELL\s+.+$',
+            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^VOLUME\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$', r'^SHELL\s+.+$',
             r'^(?:PLAY|ZXPLAY|GWPLAY)\s+.+$',
         );
         if upper.startswith("PRINT") or text.startswith("?"): return True;
@@ -1075,6 +1075,18 @@ class BasicInterpreter:
                 if remaining <= 0 and seconds > 0:
                     break;
                 self.sleep_func(remaining or 0.001);
+            return pc + 1;
+        match = re.match(r"^VOLUME\s+(.+)$", text, re.I);
+        if match:
+            body = match.group(1).strip();
+            bus = "ALL";
+            bus_match = re.match(r"^(ALL|BEEP|SOUND|PLAY|MUSIC)\b\s*,?\s*(.*)$", body, re.I);
+            if bus_match and bus_match.group(2).strip():
+                bus = bus_match.group(1).upper();
+                body = bus_match.group(2).strip();
+            value = float(self.expr.eval(body));
+            if value < 0 or value > 100: raise BasicError("VOLUME must be between 0 and 100");
+            self.audio.set_volume(bus, value / 100.0);
             return pc + 1;
         match = re.match(r"^BEEP\s+(.+)$", text, re.I);
         if match:

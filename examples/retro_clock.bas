@@ -17,6 +17,7 @@ NEXT Row!
 OldT$ = ""
 OldCols! = -1
 OldWide! = 99
+VOLUME PLAY 25
 CLS
 
 :LOOP

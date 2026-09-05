@@ -872,7 +872,36 @@
         "STR$",
         "HEX$",
         "OCT$",
-        "BIN$",
+        "BIN$"
+      ],
+      "aliases": [],
+      "language": "basic"
+    },
+    {
+      "name": "VOLUME",
+      "category": "Screen planes and compatibility (r20.2)",
+      "summary": "Sets the output level of the independent BEEP, SOUND and PLAY audio buses. Values are percentages from 0 to 100. The PLAY setting multiplies the volume encoded inside ZXPLAY/PLAY music strings; it does not replace their `V0..V15` dynamics.",
+      "syntax": [
+        "VOLUME level",
+        "VOLUME ALL level",
+        "VOLUME BEEP level",
+        "VOLUME SOUND level",
+        "VOLUME PLAY level",
+        "VOLUME MUSIC level"
+      ],
+      "example": "VOLUME BEEP 25\nVOLUME SOUND 40\nVOLUME PLAY 50\nBEEP .1, 0\nSOUND 440, 2\nPLAY BACKGROUND \"T240V15O5c\"",
+      "notes": [
+        "`VOLUME n` is shorthand for `VOLUME ALL n`.",
+        "`MUSIC` is an alias of `PLAY`.",
+        "Volume is a host-output setting. Historical BEEP",
+        "SOUND and PLAY pitch/timing semantics remain unchanged."
+      ],
+      "see_also": [
+        "BEEP",
+        "SOUND",
+        "PLAY",
+        "ZXPLAY",
+        "GWPLAY",
         "<p align=center><b>- oOo -</b></p>"
       ],
       "aliases": [],

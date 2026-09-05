@@ -1195,4 +1195,40 @@ PRINT HEX$(255,4); OCT$(255,4); BIN$(5,8)
 
 VAL, STR$, HEX$, OCT$, BIN$
 
+### VOLUME
+
+Sets the output level of the independent BEEP, SOUND and PLAY audio buses. Values are percentages from 0 to 100. The PLAY setting multiplies the volume encoded inside ZXPLAY/PLAY music strings; it does not replace their `V0..V15` dynamics.
+
+#### Syntax
+
+```text
+VOLUME level
+VOLUME ALL level
+VOLUME BEEP level
+VOLUME SOUND level
+VOLUME PLAY level
+VOLUME MUSIC level
+```
+
+#### Functional example
+
+```basic
+VOLUME BEEP 25
+VOLUME SOUND 40
+VOLUME PLAY 50
+BEEP .1, 0
+SOUND 440, 2
+PLAY BACKGROUND "T240V15O5c"
+```
+
+#### Notes
+
+- `VOLUME n` is shorthand for `VOLUME ALL n`.
+- `MUSIC` is an alias of `PLAY`.
+- Volume is a host-output setting. Historical BEEP, SOUND and PLAY pitch/timing semantics remain unchanged.
+
+#### See also
+
+BEEP, SOUND, PLAY, ZXPLAY, GWPLAY
+
 <p align=center><b>- oOo -</b></p>

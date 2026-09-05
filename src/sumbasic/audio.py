@@ -56,6 +56,14 @@ def gw_ticks_to_seconds(ticks):
     return float(ticks) / GW_BASIC_TICKS_PER_SECOND;
 
 
+def _call_tone_func(func, frequency, duration, blocking, volume):
+    """Call legacy or volume-aware tone callbacks without breaking old backends."""
+    try:
+        return func(frequency, duration, blocking, volume);
+    except TypeError:
+        return func(frequency, duration, blocking);
+
+
 def _midi_frequency(midi_note):
     return 440.0 * (2.0 ** ((float(midi_note) - 69.0) / 12.0));
 
@@ -438,6 +446,7 @@ class MusicEngine:
         self._generation = 0;
         self._generation_lock = threading.Lock();
         self._channel_players = [SystemTonePlayer(), SystemTonePlayer(), SystemTonePlayer()];
+        self.output_volume = 1.0;
 
     def _ensure_worker(self):
         with self._worker_lock:
@@ -451,6 +460,10 @@ class MusicEngine:
     def stop(self):
         with self._generation_lock: self._generation += 1;
         return None;
+
+    def set_output_volume(self, volume):
+        self.output_volume = max(0.0, min(1.0, float(volume)));
+        return self.output_volume;
 
     def _enqueue(self, tracks, background):
         completed = threading.Event();
@@ -507,10 +520,11 @@ class MusicEngine:
                 while generation == self._current_generation() and time.monotonic() < deadline:
                     self.sleep_func(min(.02, max(0.0, deadline - time.monotonic())));
                 continue;
+            volume = max(0.0, min(1.0, event.volume * self.output_volume));
             if self.tone_func is not None:
-                self.tone_func(event.frequency, event.duration, True);
+                _call_tone_func(self.tone_func, event.frequency, event.duration, True, volume);
             else:
-                player.play(event.frequency, event.duration, True, event.volume);
+                player.play(event.frequency, event.duration, True, volume);
 
 
 class AudioEngine:
@@ -520,14 +534,38 @@ class AudioEngine:
         self.beep_player = SystemTonePlayer();
         self.sound_player = SystemTonePlayer();
         self.music = MusicEngine(tone_func=tone_func, sleep_func=sleep_func);
+        self._volumes = {"BEEP": 1.0, "SOUND": 1.0, "PLAY": 1.0};
+
+    @staticmethod
+    def _volume_bus(bus):
+        key = str(bus or "ALL").strip().upper();
+        if key == "MUSIC": key = "PLAY";
+        if key not in ("ALL", "BEEP", "SOUND", "PLAY"):
+            raise ValueError("audio volume bus must be ALL, BEEP, SOUND or PLAY");
+        return key;
+
+    def set_volume(self, bus, volume):
+        key = self._volume_bus(bus);
+        value = max(0.0, min(1.0, float(volume)));
+        targets = ("BEEP", "SOUND", "PLAY") if key == "ALL" else (key,);
+        for target in targets: self._volumes[target] = value;
+        self.music.set_output_volume(self._volumes["PLAY"]);
+        return value;
+
+    def get_volume(self, bus):
+        key = self._volume_bus(bus);
+        if key == "ALL": return dict(self._volumes);
+        return self._volumes[key];
 
     def beep(self, frequency, duration):
-        if self._custom_tone_func is not None: return self._custom_tone_func(frequency, duration, True);
-        return self.beep_player.play(frequency, duration, True);
+        volume = self._volumes["BEEP"];
+        if self._custom_tone_func is not None: return _call_tone_func(self._custom_tone_func, frequency, duration, True, volume);
+        return self.beep_player.play(frequency, duration, True, volume);
 
     def sound(self, frequency, duration):
-        if self._custom_tone_func is not None: return self._custom_tone_func(frequency, duration, False);
-        return self.sound_player.play(frequency, duration, False);
+        volume = self._volumes["SOUND"];
+        if self._custom_tone_func is not None: return _call_tone_func(self._custom_tone_func, frequency, duration, False, volume);
+        return self.sound_player.play(frequency, duration, False, volume);
 
     def zxplay(self, strings, background=False):
         return self.music.play_zx(strings, background=background);

@@ -65,6 +65,7 @@ ASC_MODERN_WORDS = [
     "TIME$", "TIMER", "LOGB", "LOGBASE",
     "COLOR", "PAINT", "FILL", "CHART", "TABLE", "GOTOXY", "FONT", "ARC", "OUTTEXTXY",
     "ZXPLAY", "GWPLAY", "FOREGROUND", "BACKGROUND",
+    "VOLUME",
 ];
 ASC_MODERN_CODES = {ASC_MODERN_START + index: word for index, word in enumerate(ASC_MODERN_WORDS)};
 

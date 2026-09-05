@@ -121,3 +121,24 @@ def test_r2021_border_width_and_graphics_pause_preserves_key():
     assert any(getattr(item,"operation",None)=="border_width" and item.arguments==(24,) for item in handler.commands);
     basic.program.load_text('PAUSE .05\nK$ = INKEY$\nEND\n'); basic.run();
     assert basic.variables["k$"] == "q";
+
+
+def test_r2022_audio_bus_volume_scales_beep_sound_and_play():
+    calls = [];
+    def tone(frequency, duration, blocking, volume=1.0):
+        calls.append((blocking, round(float(volume), 4)));
+        return True;
+    basic = BasicInterpreter(output_func=lambda *a, **k: None, tone_func=tone);
+    basic.execute_immediate("VOLUME BEEP 25");
+    basic.execute_immediate("VOLUME SOUND 40");
+    basic.execute_immediate("VOLUME PLAY 50");
+    basic.execute_immediate("BEEP .01, 0");
+    basic.execute_immediate("SOUND 440, .01");
+    basic.execute_immediate('PLAY "T240V15O5c"');
+    assert calls[0] == (True, 0.25);
+    assert calls[1] == (False, 0.4);
+    assert calls[2] == (True, 0.5);
+    basic.execute_immediate("VOLUME 10");
+    assert basic.audio.get_volume("BEEP") == 0.1;
+    assert basic.audio.get_volume("SOUND") == 0.1;
+    assert basic.audio.get_volume("PLAY") == 0.1;
