@@ -229,9 +229,14 @@ class SumBasicIDE(ScriptIDE):
 
     def _ide_inkey(self):
         try:
-            return self._inkey_queue.get_nowait();
+            value = self._inkey_queue.get_nowait();
         except queue.Empty:
             return "";
+        if not getattr(self.basic_interpreter, "key_repeat", True):
+            while True:
+                try: value = self._inkey_queue.get_nowait();
+                except queue.Empty: break;
+        return value;
 
     def _ide_keyup(self):
         try:

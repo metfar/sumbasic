@@ -52,6 +52,7 @@ class TerminalInput:
         self._inkey_queue = deque();
         self._keyup_queue = deque();
         self.key_repeat = True;
+        self._last_event_extended = False;
         try:
             self.fd = self.stream.fileno();
             self.enabled = bool(self.stream.isatty());
@@ -137,11 +138,29 @@ class TerminalInput:
     def set_key_repeat(self, enabled=True):
         """Enable/disable delivery of distinguishable repeat events.
 
-        Legacy terminals send repeated printable bytes without an event type;
-        those cannot be filtered without also discarding genuine presses.
+        Legacy terminals send repeated printable bytes without an event type.
+        With repeat disabled Sum therefore treats INKEY$ as a real-time sample:
+        it returns the newest pending character and discards stale typematic
+        backlog, while Kitty release events remain untouched.
         """;
         self.key_repeat = bool(enabled);
+        if not self.key_repeat:
+            self._inkey_queue.clear();
+            self._discard_legacy_pending_input();
         return self.key_repeat;
+
+    def _discard_legacy_pending_input(self):
+        if not self.enabled: return None;
+        if self._windows:
+            try:
+                import msvcrt;
+                while msvcrt.kbhit(): msvcrt.getwch();
+            except Exception: pass;
+            return None;
+        if self.fd is not None and self._termios is not None:
+            try: self._termios.tcflush(self.fd, self._termios.TCIFLUSH);
+            except (AttributeError, OSError, ValueError): pass;
+        return None;
 
     def input(self, prompt=""):
         if not self.enabled or self._windows:
@@ -243,6 +262,7 @@ class TerminalInput:
 
     def _poll_key_event(self):
         """Return ``(action, value)`` without losing the opposite event kind.""";
+        self._last_event_extended = False;
         if not self.enabled:
             return "none", "";
         if self._windows:
@@ -276,6 +296,7 @@ class TerminalInput:
                 if data.endswith(b"u"): break;
         kitty = self._decode_kitty_key(data);
         if kitty is not None:
+            self._last_event_extended = True;
             value, event_type = kitty;
             return {1: "press", 2: "repeat", 3: "release"}.get(event_type, "press"), value;
         return "press", self._decode_key(data);
@@ -292,6 +313,15 @@ class TerminalInput:
         if action == "repeat" and not self.key_repeat:
             return "";
         if action in ("press", "repeat"):
+            if not self.key_repeat and not self._last_event_extended and not self._windows:
+                # _read_posix_bytes intentionally drains the currently ready
+                # kernel bytes.  For real-time KEYREPEAT OFF semantics keep only
+                # the newest decoded character, then flush any typematic bytes
+                # that arrived while the sequence was being decoded.
+                if len(value) > 1 and not value.startswith("\x1b"): value = value[-1];
+                self._inkey_queue.clear();
+                self._discard_legacy_pending_input();
+                return value;
             if len(value) > 1 and not value.startswith("\x1b"):
                 for char in value[1:]: self._inkey_queue.append(char);
                 return value[0];
@@ -304,6 +334,14 @@ class TerminalInput:
         action, value = self._poll_key_event();
         if action == "release":
             return value;
+        if action == "repeat" and not self.key_repeat:
+            return "";
         if action in ("press", "repeat") and value:
-            self._inkey_queue.append(value);
+            if not self.key_repeat and not self._last_event_extended and not self._windows:
+                if len(value) > 1 and not value.startswith("\x1b"): value = value[-1];
+                self._inkey_queue.clear();
+                self._inkey_queue.append(value);
+                self._discard_legacy_pending_input();
+            else:
+                self._inkey_queue.append(value);
         return "";

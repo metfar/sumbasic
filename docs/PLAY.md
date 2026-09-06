@@ -39,6 +39,43 @@ The current alpha implements the musical core:
 
 The AY-specific selectors `M`, `W`, `X`, and `U` are parsed and range-checked so old strings can already be loaded. Exact AY noise/envelope synthesis and the manual's indefinite `))` phrase repetition are reserved for the next audio pass rather than silently emulated incorrectly.
 
+### ZX notes, rests, accidentals and dotted values
+
+ZX `PLAY` uses compact notation whose placement differs from GW-BASIC:
+
+| Music item | ZX spelling | Example |
+| --- | --- | --- |
+| Notes | `c d e f g a b` | `O5cde` |
+| Upper octave | `C D E F G A B` | `O5C` |
+| Sharp | `#` **before** the note | `#c` |
+| Flat | `$` **before** the note | `$e` |
+| Rest | `&` | `5&` |
+| Duration | `1..9` before notes/rests | `5c` |
+| Triplet duration | `10..12` | `10cde` |
+
+The normal duration codes use quarter-note units internally:
+
+| Code | Musical value | Quarter-note units |
+| ---: | --- | ---: |
+| `1` | sixteenth | 1/4 |
+| `2` | dotted sixteenth | 3/8 |
+| `3` | eighth | 1/2 |
+| `4` | dotted eighth | 3/4 |
+| `5` | quarter | 1 |
+| `6` | dotted quarter | 3/2 |
+| `7` | half | 2 |
+| `8` | dotted half | 3 |
+| `9` | whole | 4 |
+
+So a ZX dotted note does **not** use a literal period. For example `6c` is a dotted quarter C and `6#c` is a dotted quarter C-sharp. `5&` is a quarter rest.
+
+ZX Spectrum octave numbers are offset from scientific pitch notation: `O5c` is scientific `C4` (middle C).
+
+```basic
+PLAY "T120O5N5c6#d5&5$e"
+# quarter C, dotted-quarter D-sharp, quarter rest, quarter E-flat
+```
+
 ### Foreground and background
 
 The historical Spectrum PLAY is foreground by default:
@@ -105,6 +142,26 @@ The current alpha supports:
 - `N0..N84` numeric notes;
 - `MN`, `ML`, `MS` for normal, legato, and staccato articulation;
 - `MF` foreground and `MB` background.
+
+### GW notes, rests, accidentals and dots
+
+GWPLAY puts accidentals **after** the note and uses the familiar dot suffix:
+
+| Music item | GW spelling | Example |
+| --- | --- | --- |
+| Notes | `A..G` | `CDEFG` |
+| Sharp | `#` or `+` after note | `C#` or `C+` |
+| Flat | `-` after note | `E-` |
+| Rest | `P` plus a length | `P4` |
+| Dotted note | `.` after note/length | `C4.` |
+| Dotted rest | `.` after rest length | `P4.` |
+| Double dot | repeated `.` | `C4..` |
+
+`L4 C` means a quarter C using the default length. `C8.` overrides the current length for one dotted eighth note. `P4.` is a dotted quarter rest.
+
+```basic
+GWPLAY "T120 O4 L4 C D# E. P4 E-"
+```
 
 Therefore both historical and explicit sumBASIC spellings work:
 

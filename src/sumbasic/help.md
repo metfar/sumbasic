@@ -302,7 +302,7 @@ BEEP, PLAY
 
 ### PLAY
 
-Plays music using the BASIC music-string facilities.
+Plays music using the ZX Spectrum 128 or GW-BASIC music-string facilities.
 
 #### Syntax
 
@@ -314,16 +314,46 @@ PLAY STOP
 PLAY OFF
 ZXPLAY string-expression
 GWPLAY string-expression
+
+ZX notes:      c d e f g a b   or C D E F G A B
+ZX sharp:      # before the note        #c
+ZX flat:       $ before the note        $e
+ZX rest:       &
+ZX durations:  1 2 3 4 5 6 7 8 9 10 11 12
+GW notes:      A B C D E F G
+GW sharp:      # or + after the note    C#  C+
+GW flat:       - after the note         E-
+GW rest:       P followed by length     P4
+GW dotted:     . after note/rest        C4.  P4.
 ```
+
+#### Notes
+
+- `PLAY` is the ZX Spectrum dialect and `ZXPLAY` is its explicit spelling.
+- ZX lower-case notes use the selected octave and upper-case notes use the octave immediately above it.
+- ZX octave numbers are one greater than scientific pitch labels; `O5c` is scientific `C4`.
+- ZX `#` raises the following note one semitone and `$` lowers the following note one semitone.
+- ZX `&` is a rest using the current duration.
+- ZX duration `1` is a sixteenth note; `3` is an eighth; `5` is a quarter; `7` is a half; `9` is a whole note.
+- ZX dotted values are duration `2` for dotted sixteenth; `4` for dotted eighth; `6` for dotted quarter; `8` for dotted half. A literal period is not ZX dotted-note syntax.
+- ZX durations `10` through `12` are triplet duration codes.
+- GWPLAY writes accidentals after the note; `#` or `+` means sharp and `-` means flat.
+- GWPLAY uses `P` for a rest. `P4` is a quarter rest and `P4.` is a dotted quarter rest.
+- GWPLAY uses one or more periods after a note or rest for dots. For example `C4.` is dotted quarter C and `C4..` is double-dotted quarter C.
 
 #### Functional example
 
 ```basic
+# ZX Spectrum PLAY: C quarter, D-sharp dotted quarter, rest, E-flat quarter.
+PLAY "T120O5N5c6#d5&5$e"
+
+# GW-BASIC PLAY: C quarter, D-sharp, dotted E, quarter rest, E-flat.
+GWPLAY "T120 O4 L4 C D# E. P4 E-"
+
 PLAY BACKGROUND "T120O5cdefgabC"
 PAUSE .25
 PLAY STOP
-PLAY BACKGROUND "T240O4g"
-PLAY HOLD 3, "T240V15O4c"
+PLAY HOLD 3, "T240V15O5c"
 ```
 
 #### See also
@@ -492,8 +522,10 @@ events from GUI/Kitty-capable backends while preserving the initial press and
 the eventual `KEYUP$`.
 
 A legacy POSIX TTY does not label typematic bytes as repeats; each repeated
-character is indistinguishable from a fresh key press. `KEYREPEAT OFF` therefore
-cannot filter those bytes without also discarding legitimate input.
+character is indistinguishable from a fresh key press. With `KEYREPEAT OFF`,
+`INKEY$` therefore switches to real-time sampling semantics on that backend:
+the newest pending character is returned and stale typematic backlog is
+discarded. This prevents a released key from remaining queued for later polls.
 
 #### Syntax
 

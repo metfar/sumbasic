@@ -587,6 +587,8 @@ END IF
 viewport and accepts both mouse clicks and the 29-key chromatic mapping
 `zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
 the existing PLAY synthesizer at `VOLUME PLAY 150` (1.5x software gain). The
+keyboard spans scientific C5 through E7 (`O6..O8` in ZX PLAY numbering), avoiding
+the low register that small Linux/Android speakers commonly reproduce poorly. The
 demo uses `PLAY HOLD 0` and stops immediately on graphical/Kitty `KEYUP$` or
 mouse/touch release. On legacy TTYs, typematic repeats act as a heartbeat: after
 an initial grace period, three polling windows without the held key are treated

@@ -1,3 +1,9 @@
+## 0.2.29
+
+- Made `KEYREPEAT OFF` use real-time destructive sampling on legacy POSIX TTY input: `INKEY$` keeps only the newest currently pending character and discards stale typematic backlog, preventing a released key from remaining queued across piano polls.
+- Shifted `piano_text.bas` to the scientifically labelled C5..E7 range (`O6..O8` in ZX PLAY numbering) while retaining 150% PLAY software gain.
+- Expanded runtime PLAY help with notes, rests, sharps, flats, dotted values and explicit ZX-versus-GW notation examples; regenerated `help.helpdb`.
+
 ## 0.2.28
 
 - Added `KEYREPEAT ON/OFF`; GUI/Kitty repeat events can be suppressed without losing press/release, Pygame repeat generation is disabled while OFF, and legacy TTY typematic bytes remain intentionally available as a held-key heartbeat.

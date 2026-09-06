@@ -47,6 +47,8 @@ GWPLAY "T180 O4 L8 C D E F G A B"
 
 `PLAY` is an alias of `ZXPLAY`. The Spectrum 128 dialect supports up to three simultaneous strings. `GWPLAY` is a separate Microsoft/GW-BASIC MML parser rather than an auto-detected dialect. See `docs/PLAY.md` for the string languages and current compatibility surface.
 
+Quick notation reminder: ZX uses `c..b` / `C..B` for notes, `#c` for a sharp, `$e` for a flat and `&` for a rest. ZX dotted values are encoded by duration codes `2`, `4`, `6`, and `8`; it does not use `.` as a dotted-note suffix. GWPLAY uses `C#` or `C+` for a sharp, `E-` for a flat, `P4` for a rest and `C4.` / `P4.` for dotted notes/rests.
+
 Both music dialects accept the sumBASIC execution-mode extension:
 
 ```basic

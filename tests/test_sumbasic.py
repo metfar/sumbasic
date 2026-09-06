@@ -1431,7 +1431,7 @@ def test_clickable_text_piano_black_key_hit_uses_existing_play_bus():
     basic.program.load_file(root / "piano_text.bas");
     basic.run();
     basic.audio.stop_all();
-    assert "Playing C#3 with [s]" in "".join(output);
+    assert "Playing C#5 with [s]" in "".join(output);
 
 
 
@@ -1508,7 +1508,7 @@ def test_clickable_text_piano_white_key_hit_uses_existing_play_bus():
     basic.program.load_file(root / "piano_text.bas");
     basic.run();
     basic.audio.stop_all();
-    assert "Playing C3 with [z]" in "".join(output);
+    assert "Playing C5 with [z]" in "".join(output);
 
 
 def test_terminal_input_kitty_ctrl_c_preserves_interrupt_semantics():
@@ -1597,9 +1597,9 @@ def test_piano_note_labels_match_scientific_pitch_via_zx_octave_numbering():
         events, _tempo = parser.parse(source);
         assert abs(events[0].frequency - expected) < 1e-9;
     piano = (Path(__file__).resolve().parents[1] / "examples" / "piano_text.bas").read_text();
-    assert 'DATA "z", "O4c",  "C3"' in piano;
-    assert 'DATA "q", "O5c",  "C4"' in piano;
-    assert 'DATA "i", "O6c",  "C5"' in piano;
+    assert 'DATA "z", "O6c",  "C5"' in piano;
+    assert 'DATA "q", "O7c",  "C6"' in piano;
+    assert 'DATA "i", "O8c",  "C7"' in piano;
 
 def test_sum_basic_ide_keyrepeat_off_disables_active_pygame_repeat():
     from sumbasic.ide import SumBasicIDE;
@@ -1652,3 +1652,81 @@ def test_terminal_input_splits_batched_plain_typematic_characters():
     assert terminal.inkey() == "z";
     assert terminal.inkey() == "z";
     assert terminal.inkey() == "z";
+
+
+def test_terminal_inkey_keyrepeat_off_coalesces_legacy_typematic_backlog(monkeypatch):
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput(stream=type("Stream", (), {"fileno": lambda self: 0, "isatty": lambda self: True, "encoding": "utf-8"})());
+    terminal.enabled = True;
+    terminal._windows = False;
+    terminal.key_repeat = False;
+    terminal._last_event_extended = False;
+    discarded = [];
+    monkeypatch.setattr(terminal, "_poll_key_event", lambda: (setattr(terminal, "_last_event_extended", False) or ("press", "zzzz")));
+    monkeypatch.setattr(terminal, "_discard_legacy_pending_input", lambda: discarded.append(True));
+    assert terminal.inkey() == "z";
+    assert list(terminal._inkey_queue) == [];
+    assert discarded == [True];
+
+
+def test_terminal_inkey_keyrepeat_off_does_not_flush_kitty_press(monkeypatch):
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput(stream=type("Stream", (), {"fileno": lambda self: 0, "isatty": lambda self: True, "encoding": "utf-8"})());
+    terminal.enabled = True;
+    terminal._windows = False;
+    terminal.key_repeat = False;
+    discarded = [];
+    def poll():
+        terminal._last_event_extended = True;
+        return "press", "z";
+    monkeypatch.setattr(terminal, "_poll_key_event", poll);
+    monkeypatch.setattr(terminal, "_discard_legacy_pending_input", lambda: discarded.append(True));
+    assert terminal.inkey() == "z";
+    assert discarded == [];
+
+
+def test_terminal_keyup_does_not_backlog_legacy_typematic_when_keyrepeat_is_off(monkeypatch):
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput(stream=type("Stream", (), {"fileno": lambda self: 0, "isatty": lambda self: True, "encoding": "utf-8"})());
+    terminal.enabled = True;
+    terminal._windows = False;
+    terminal.key_repeat = False;
+    discarded = [];
+    def poll():
+        terminal._last_event_extended = False;
+        return "press", "zzzz";
+    monkeypatch.setattr(terminal, "_poll_key_event", poll);
+    monkeypatch.setattr(terminal, "_discard_legacy_pending_input", lambda: discarded.append(True));
+    assert terminal.keyup() == "";
+    assert list(terminal._inkey_queue) == ["z"];
+    assert terminal.inkey() == "z";
+    assert list(terminal._inkey_queue) == [];
+    assert discarded == [True];
+
+
+def test_terminal_keyup_suppresses_kitty_repeat_when_keyrepeat_is_off(monkeypatch):
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput(stream=type("Stream", (), {"fileno": lambda self: 0, "isatty": lambda self: True, "encoding": "utf-8"})());
+    terminal.enabled = True;
+    terminal._windows = False;
+    terminal.key_repeat = False;
+    def poll():
+        terminal._last_event_extended = True;
+        return "repeat", "z";
+    monkeypatch.setattr(terminal, "_poll_key_event", poll);
+    assert terminal.keyup() == "";
+    assert list(terminal._inkey_queue) == [];
+
+
+def test_play_runtime_help_documents_notes_rests_accidentals_and_dots():
+    from sumbasic.helpdb import find_topic;
+    topic = find_topic("PLAY");
+    assert topic is not None;
+    text = "\n".join(topic.syntax + topic.notes + (topic.example,));
+    assert "ZX notes" in text;
+    assert "# before the note" in text;
+    assert "$ before the note" in text;
+    assert "ZX rest" in text and "&" in text;
+    assert "dotted" in text.lower();
+    assert "GW rest" in text and "P4" in text;
+    assert "C4." in text and "P4." in text;
