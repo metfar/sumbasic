@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.25
+Version: 0.2.28
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,10 +10,10 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumcore>=0.1.0a5
+Requires-Dist: sumcore>=0.1.0a8
 Requires-Dist: sumui>=0.1.0a13
-Requires-Dist: sumtui>=0.8.0a14
-Requires-Dist: sumide>=0.2.19
+Requires-Dist: sumtui>=0.8.0a16
+Requires-Dist: sumide>=0.2.20
 Requires-Dist: sumx>=0.2.17
 Requires-Dist: sumdata>=0.1.0a1
 Requires-Dist: sumplot>=0.1.0a1
@@ -612,8 +612,10 @@ END IF
 `examples/piano_text.bas` draws as many keys as fit in the current text
 viewport and accepts both mouse clicks and the 29-key chromatic mapping
 `zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
-the existing PLAY synthesizer. `PLAY HOLD 3, note$` sustains a note, renews its
-three-second safety timeout without retriggering on keyboard repeat, and stops
-immediately on graphical `KEYUP$` or mouse/touch release.
+the existing PLAY synthesizer at `VOLUME PLAY 150` (1.5x software gain). The
+demo uses `PLAY HOLD 0` and stops immediately on graphical/Kitty `KEYUP$` or
+mouse/touch release. On legacy TTYs, typematic repeats act as a heartbeat: after
+an initial grace period, three polling windows without the held key are treated
+as release.
 
 <p align=center><b>- oOo -</b></p>

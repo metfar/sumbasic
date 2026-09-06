@@ -583,11 +583,13 @@ IF MOUSEBUTTON() = 1 THEN
 END IF
 ```
 
-`examples/piano_text.bas` (still working on this) draws as many keys as fit in the current text
+`examples/piano_text.bas` draws as many keys as fit in the current text
 viewport and accepts both mouse clicks and the 29-key chromatic mapping
 `zsxdcvgbhnjm`, `q2w3er5t6y7u`, `i9o0p`. Audio is produced exclusively by
-the existing PLAY synthesizer. `PLAY HOLD 3, note$` sustains a note, renews its
-three-second safety timeout without retriggering on keyboard repeat, and stops
-immediately on graphical `KEYUP$` or mouse/touch release.
+the existing PLAY synthesizer at `VOLUME PLAY 150` (1.5x software gain). The
+demo uses `PLAY HOLD 0` and stops immediately on graphical/Kitty `KEYUP$` or
+mouse/touch release. On legacy TTYs, typematic repeats act as a heartbeat: after
+an initial grace period, three polling windows without the held key are treated
+as release.
 
 <p align=center><b>- oOo -</b></p>

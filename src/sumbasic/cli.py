@@ -84,6 +84,9 @@ def _run_loaded(interpreter, interactive_terminal=False):
                 terminal.pointer_callback = interpreter.queue_pointer;
                 interpreter.input_func = terminal.input;
                 interpreter.inkey_func = terminal.inkey;
+                interpreter.keyup_func = terminal.keyup;
+                interpreter.keyrepeat_func = terminal.set_key_repeat;
+                terminal.set_key_repeat(getattr(interpreter, "key_repeat", True));
                 interpreter.shell_interactive_func = lambda: terminal.run_external(run_interactive_shell);
                 interpreter.run();
                 _finish_audio(interpreter);
@@ -93,6 +96,10 @@ def _run_loaded(interpreter, interactive_terminal=False):
         _finish_audio(interpreter);
         _finish_graphics(interpreter, wait=False);
         return 0;
+    except KeyboardInterrupt:
+        interpreter.audio.stop_all();
+        print();
+        return 130;
     except (BasicError, GraphicsBackendError) as exc:
         print("sumBASIC error: {}".format(exc), file=sys.stderr);
         return 1;

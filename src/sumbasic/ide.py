@@ -167,6 +167,7 @@ class SumBasicIDE(ScriptIDE):
                 output_func=self._basic_output,
                 inkey_func=self._ide_inkey,
                 keyup_func=self._ide_keyup,
+                keyrepeat_func=self._ide_keyrepeat,
                 shell_interactive_func=self._interactive_shell,
                 shell_output_func=self._shell_output,
                 graphics_handler=SumGuiGraphicsHandler(title="sumBASIC graphics"),
@@ -175,6 +176,7 @@ class SumBasicIDE(ScriptIDE):
             self.basic_interpreter.output_func = self._basic_output;
             self.basic_interpreter.inkey_func = self._ide_inkey;
             self.basic_interpreter.keyup_func = self._ide_keyup;
+            self.basic_interpreter.keyrepeat_func = self._ide_keyrepeat;
             self.basic_interpreter.shell_interactive_func = self._interactive_shell;
             self.basic_interpreter.shell_output_func = self._shell_output;
             if getattr(self.basic_interpreter.graphics, "handler", None) is None:
@@ -237,6 +239,18 @@ class SumBasicIDE(ScriptIDE):
         except queue.Empty:
             return "";
 
+    def _ide_keyrepeat(self, enabled=True):
+        enabled = bool(enabled);
+        backend = getattr(self.app, "_active_gui_backend", None);
+        pygame = getattr(backend, "pygame", None);
+        if pygame is not None:
+            try:
+                if enabled: pygame.key.set_repeat(250, 31);
+                else: pygame.key.set_repeat(0, 0);
+            except Exception:
+                pass;
+        return enabled;
+
     def _queue_program_key(self, value):
         if value:
             self._inkey_queue.put(str(value));
@@ -245,14 +259,20 @@ class SumBasicIDE(ScriptIDE):
     def _dispatch_event(self, event):
         running = self._run_thread is not None and self._run_thread.is_alive();
         if running and isinstance(event, MouseEvent) and event.button == "left" and event.action in ("press", "release", "move"):
-            translated = self.output_window._interior_event(event);
+            # Application mouse coordinates include MenuDesktop's one-row menu.
+            # WorkspaceWindow geometry is relative to the client body, so remove
+            # that row before mapping the click back to BASIC LOCATE cells.
+            client_event = event.translated(0, 1);
+            translated = self.output_window._interior_event(client_event);
             if translated is not None:
                 column = int(translated.x) + int(getattr(self.output_view, "x_offset", 0)) + 1;
                 row = int(translated.y) + int(getattr(self.output_view, "offset", 0)) + 1;
                 self.basic_interpreter.queue_pointer(column, row, button=0 if event.action == "release" else 1);
                 return True;
         if running and isinstance(event, KeyEvent):
-            if getattr(event, "action", "press") == "release":
+            action = getattr(event, "action", "press");
+            if action == "repeat" and not getattr(self.basic_interpreter, "key_repeat", True): return True;
+            if action == "release":
                 if event.key == Key.ESCAPE: return self.basic_interpreter.queue_keyup(chr(27));
                 if event.key == Key.SPACE: return self.basic_interpreter.queue_keyup(" ");
                 if event.text and not event.ctrl and not event.alt: return self.basic_interpreter.queue_keyup(event.text);

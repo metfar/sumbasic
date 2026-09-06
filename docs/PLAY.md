@@ -26,7 +26,7 @@ The current alpha implements the musical core:
 
 - note letters `c d e f g a b` and `C D E F G A B`; upper-case notes are the upper octave of the current two-octave range;
 - `#` before a note raises it by a semitone and `$` lowers it by a semitone; repeated accidentals are accepted;
-- `O0..O8` chooses the Spectrum octave range; the default is `O5`;
+- `O0..O10` chooses the Spectrum octave range (extended by Sum); the default is `O5`;
 - duration codes `1..9`, plus triplet codes `10..12`;
 - `&` is a rest using the current duration;
 - `N` is the original numeric separator, useful in strings such as `O5N3cde`;
@@ -80,8 +80,9 @@ PLAY STOP
 
 The default safety timeout is three seconds. Repeating the identical command
 renews that timeout without restarting the tone, so keyboard auto-repeat can
-keep it alive smoothly. A timeout of zero disables the safety limit when the
-input backend guarantees a release event. `PLAY STOP` releases it immediately.
+keep it alive smoothly. A timeout of zero disables the safety limit and leaves
+release under explicit program control (`KEYUP$`, pointer release, or a legacy
+TTY heartbeat heuristic). `PLAY STOP` releases it immediately.
 
 ## GW-BASIC PLAY
 
@@ -130,3 +131,7 @@ PRINT "music continues"
 `STOP` suspends BASIC without discarding background music. An IDE user-abort requests audio cancellation; a normal command-line run waits for queued background sound/music before the short-lived `sumbasic` process exits.
 
 <p align=center><b>- oOo -</b></p>
+
+### Octave numbering
+
+ZX Spectrum `PLAY` octave numbers are one higher than modern scientific pitch labels: `O5c` is middle C (`C4`, about 261.63 Hz), `O4c` is `C3`, and `O6c` is `C5`. Examples that display scientific note names should account for that offset.

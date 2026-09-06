@@ -1434,6 +1434,93 @@ def test_clickable_text_piano_black_key_hit_uses_existing_play_bus():
     assert "Playing C#3 with [s]" in "".join(output);
 
 
+
+def test_terminal_input_kitty_release_is_exposed_through_keyup_queue():
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput();
+    assert terminal._decode_kitty_key(b"\x1b[122;1:3u") == ("z", 3);
+    events = iter((("release", "z"), ("press", "x")));
+    terminal.enabled = True;
+    terminal._windows = False;
+    terminal._poll_key_event = lambda: next(events);
+    assert terminal.inkey() == "";
+    assert terminal.keyup() == "z";
+    assert terminal.keyup() == "";
+    assert terminal.inkey() == "x";
+
+
+def test_sum_basic_ide_mouse_event_removes_menu_row_before_output_mapping():
+    from sumbasic.ide import SumBasicIDE;
+    from sumtui import MouseEvent;
+    class RunningThread:
+        @staticmethod
+        def is_alive(): return True;
+    ide = SumBasicIDE(path=None);
+    ide._run_thread = RunningThread();
+    seen = [];
+    ide.output_window._interior_event = lambda event: (seen.append((event.x, event.y)) or None);
+    ide._dispatch_event(MouseEvent(12, 9, button="left", action="press"));
+    assert seen == [(12, 8)];
+
+
+def test_zxplay_extended_octave_range_accepts_o10_and_rejects_o11():
+    from sumbasic.audio import ZXPlayParser, MusicParseError;
+    events, _tempo = ZXPlayParser().parse("O10c");
+    assert len(events) == 1;
+    assert events[0].frequency > 8000.0;
+    try:
+        ZXPlayParser().parse("O11c");
+        assert False, "O11 must remain outside the supported range";
+    except MusicParseError as exc:
+        assert "0..10" in str(exc);
+
+
+def test_system_tone_player_uses_short_release_for_held_pygame_channel():
+    from sumbasic.audio import SystemTonePlayer;
+    fades = [];
+    class Channel:
+        def fadeout(self, milliseconds): fades.append(milliseconds);
+    player = SystemTonePlayer(release_ms=8);
+    player._hold_channel = Channel();
+    player._hold_backend = "pygame";
+    player.stop();
+    assert fades == [8];
+    assert player.sample_rate == 48000;
+
+def test_clickable_text_piano_white_key_hit_uses_existing_play_bus():
+    from sumui import TextScreen;
+    output = [];
+    calls = [0];
+    basic = None;
+    def inkey():
+        calls[0] += 1;
+        if calls[0] == 1:
+            basic.queue_pointer(3, 4, button=1);
+            return "";
+        return chr(27);
+    basic = BasicInterpreter(
+        output_func=lambda text, end="\n": output.append(str(text) + end),
+        inkey_func=inkey,
+        sleep_func=lambda _seconds: None,
+        text_screen=TextScreen(size_provider=lambda: (80, 25)),
+    );
+    root = Path(__file__).resolve().parents[1] / "examples";
+    basic.program.load_file(root / "piano_text.bas");
+    basic.run();
+    basic.audio.stop_all();
+    assert "Playing C3 with [z]" in "".join(output);
+
+
+def test_terminal_input_kitty_ctrl_c_preserves_interrupt_semantics():
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput();
+    try:
+        terminal._decode_kitty_key(b"\x1b[99;5:1u");
+        assert False, "Ctrl+C must remain an interrupt";
+    except KeyboardInterrupt:
+        pass;
+
+
 def test_r211_command_tail_exposes_string_count_and_zero_based_arrays():
     basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
     basic.set_program_args(["--octava", "5", "two words"]);
@@ -1461,3 +1548,107 @@ def test_r211_command_args_and_retro_clock_examples_check_cleanly():
         basic = BasicInterpreter(output_func=lambda *args, **kwargs: None);
         basic.program.load_file(root / name);
         assert basic.check() is True;
+
+
+def test_terminal_input_requests_keyboard_event_types_with_explicit_setter(monkeypatch):
+    import sumbasic.terminal_input as terminal_input;
+    writes = [];
+    terminal = terminal_input.TerminalInput();
+    terminal.enabled = True;
+    terminal._windows = False;
+    terminal.fd = 9;
+    monkeypatch.setattr(terminal_input.os, "write", lambda fd, data: (writes.append((fd, data)) or len(data)));
+    terminal._enable_keyboard();
+    assert writes[-1] == (9, b"\x1b[>27u\x1b[=27u");
+    terminal._disable_keyboard();
+    assert writes[-1] == (9, b"\x1b[=0u\x1b[<u");
+
+
+def test_piano_uses_150_percent_play_gain_for_all_notes():
+    from sumui import TextScreen;
+    root = Path(__file__).resolve().parents[1] / "examples";
+    def run_key(key):
+        output = [];
+        keys = iter((key, chr(27)));
+        basic = BasicInterpreter(
+            output_func=lambda text, end="\n": output.append(str(text) + end),
+            inkey_func=lambda: next(keys, chr(27)),
+            keyup_func=lambda: "",
+            sleep_func=lambda _seconds: None,
+            text_screen=TextScreen(size_provider=lambda: (80, 25)),
+        );
+        holds = [];
+        basic.audio.zxplay_hold = lambda source, timeout=3.0: holds.append((source, timeout, basic.audio.get_volume("PLAY")));
+        basic.program.load_file(root / "piano_text.bas");
+        basic.run();
+        basic.audio.stop_all();
+        return holds;
+    for key in ("z", "w", "e", "p"):
+        held = run_key(key);
+        assert held and abs(held[0][2] - 1.5) < 1e-12;
+        assert held[0][1] == 0.0;
+
+
+
+def test_piano_note_labels_match_scientific_pitch_via_zx_octave_numbering():
+    from sumbasic.audio import ZXPlayParser;
+    parser = ZXPlayParser();
+    for source, expected in (("O4c", 130.8127826502993), ("O5c", 261.6255653005986), ("O6c", 523.2511306011972)):
+        events, _tempo = parser.parse(source);
+        assert abs(events[0].frequency - expected) < 1e-9;
+    piano = (Path(__file__).resolve().parents[1] / "examples" / "piano_text.bas").read_text();
+    assert 'DATA "z", "O4c",  "C3"' in piano;
+    assert 'DATA "q", "O5c",  "C4"' in piano;
+    assert 'DATA "i", "O6c",  "C5"' in piano;
+
+def test_sum_basic_ide_keyrepeat_off_disables_active_pygame_repeat():
+    from sumbasic.ide import SumBasicIDE;
+    calls = [];
+    class KeyModule:
+        @staticmethod
+        def set_repeat(delay, interval): calls.append((delay, interval));
+    class Pygame:
+        key = KeyModule();
+    class Backend:
+        pygame = Pygame();
+    ide = SumBasicIDE(path=None);
+    ide.app._active_gui_backend = Backend();
+    assert ide._ide_keyrepeat(False) is False;
+    assert calls[-1] == (0, 0);
+    assert ide._ide_keyrepeat(True) is True;
+    assert calls[-1] == (250, 31);
+
+
+def test_keyrepeat_statement_controls_distinguishable_repeat_delivery():
+    seen = [];
+    basic = BasicInterpreter(output_func=lambda *args, **kwargs: None, keyrepeat_func=lambda enabled: seen.append(bool(enabled)));
+    basic.program.load_text("KEYREPEAT OFF\nKEYREPEAT ON\n");
+    assert basic.check() is True;
+    basic.run();
+    assert seen[-2:] == [False, True];
+    assert basic.key_repeat is True;
+
+
+def test_terminal_input_keyrepeat_off_filters_kitty_repeat_but_not_press():
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput();
+    terminal.enabled = True;
+    terminal._windows = False;
+    events = iter((("repeat", "z"), ("press", "z")));
+    terminal._poll_key_event = lambda: next(events);
+    terminal.set_key_repeat(False);
+    assert terminal.inkey() == "";
+    assert terminal.inkey() == "z";
+
+
+def test_terminal_input_splits_batched_plain_typematic_characters():
+    from sumbasic.terminal_input import TerminalInput;
+    terminal = TerminalInput();
+    terminal.enabled = True;
+    terminal._windows = False;
+    events = iter((("press", "zzzz"), ("none", "")));
+    terminal._poll_key_event = lambda: next(events);
+    assert terminal.inkey() == "z";
+    assert terminal.inkey() == "z";
+    assert terminal.inkey() == "z";
+    assert terminal.inkey() == "z";

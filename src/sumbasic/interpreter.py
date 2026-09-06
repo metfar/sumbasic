@@ -55,7 +55,7 @@ class _BasicStop(Exception):
 
 
 class BasicInterpreter:
-    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None, text_screen=None, keyup_func=None):
+    def __init__(self, input_func=input, output_func=print, inkey_func=None, sleep_func=None, now_func=None, tone_func=None, shell_command_func=None, shell_interactive_func=None, shell_output_func=None, graphics_handler=None, text_screen=None, keyup_func=None, keyrepeat_func=None):
         self.program = BasicProgram();
         self.program_args = [];
         self.program_command = "";
@@ -70,6 +70,8 @@ class BasicInterpreter:
         self.inkey_func = inkey_func if inkey_func is not None else (lambda: "");
         self._inkey_buffer = [];
         self.keyup_func = keyup_func if keyup_func is not None else (lambda: "");
+        self.keyrepeat_func = keyrepeat_func;
+        self.key_repeat = True;
         self._keyup_buffer = [];
         self._pointer_lock = threading.Lock();
         self._pointer_x = 0;
@@ -168,6 +170,10 @@ class BasicInterpreter:
         self.data_index = 0;
         self.data_line_index = {};
         self.option_base = 0;
+        self.key_repeat = True;
+        if callable(self.keyrepeat_func):
+            try: self.keyrepeat_func(True);
+            except Exception: pass;
         self.patterns = {};
         with self._pointer_lock:
             self._pointer_button = 0;
@@ -570,7 +576,7 @@ class BasicInterpreter:
             r'^NEXT(?:\s+[A-Za-z_][A-Za-z0-9_]*[$%&!]?)?$', r'^WHILE\s+.+$',
             r'^DO(?:\s+(?:WHILE|UNTIL)\s+.+)?$', r'^LOOP(?:\s+(?:WHILE|UNTIL)\s+.+)?$',
             r'^READ\s+.+$', r'^RESTORE(?:\s+.+)?$', r'^SWAP\s+.+?,\s*.+$',
-            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^VOLUME\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$', r'^SHELL\s+.+$',
+            r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^KEYREPEAT\s+(?:ON|OFF)$', r'^VOLUME\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$', r'^SHELL\s+.+$',
             r'^(?:PLAY|ZXPLAY|GWPLAY)\s+.+$',
         );
         if upper.startswith("PRINT") or text.startswith("?"): return True;
@@ -1149,6 +1155,13 @@ class BasicInterpreter:
                     break;
                 self.sleep_func(remaining or 0.001);
             return pc + 1;
+        match = re.match(r"^KEYREPEAT\s+(ON|OFF)$", text, re.I);
+        if match:
+            self.key_repeat = match.group(1).upper() == "ON";
+            if callable(self.keyrepeat_func):
+                try: self.keyrepeat_func(self.key_repeat);
+                except Exception: pass;
+            return pc + 1;
         match = re.match(r"^VOLUME\s+(.+)$", text, re.I);
         if match:
             body = match.group(1).strip();
@@ -1158,7 +1171,7 @@ class BasicInterpreter:
                 bus = bus_match.group(1).upper();
                 body = bus_match.group(2).strip();
             value = float(self.expr.eval(body));
-            if value < 0 or value > 100: raise BasicError("VOLUME must be between 0 and 100");
+            if value < 0 or value > 300: raise BasicError("VOLUME must be between 0 and 300");
             self.audio.set_volume(bus, value / 100.0);
             return pc + 1;
         match = re.match(r"^BEEP\s+(.+)$", text, re.I);

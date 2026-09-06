@@ -460,8 +460,11 @@ INPUT
 
 ### KEYUP$
 
-Returns a released key in graphical backends, or an empty string. Terminal
-keyboards generally cannot report releases; use a safety timeout there.
+Returns a released key when the active backend reports one. Graphical backends
+and Kitty-compatible terminals can provide exact release events. sumTUI and the
+direct `--run` terminal path both negotiate Kitty progressive keyboard events.
+Legacy POSIX TTYs transmit key presses/characters but no physical key-release
+event, so interactive programs need a repeat/timeout heuristic there.
 
 #### Syntax
 
@@ -479,6 +482,39 @@ IF K$ <> "" THEN PRINT "Released: "; K$
 #### See also
 
 INKEY$, PLAY
+
+
+### KEYREPEAT
+
+Controls whether distinguishable keyboard repeat events are delivered to a
+running BASIC program. The default is `ON`. `OFF` suppresses explicit `repeat`
+events from GUI/Kitty-capable backends while preserving the initial press and
+the eventual `KEYUP$`.
+
+A legacy POSIX TTY does not label typematic bytes as repeats; each repeated
+character is indistinguishable from a fresh key press. `KEYREPEAT OFF` therefore
+cannot filter those bytes without also discarding legitimate input.
+
+#### Syntax
+
+```text
+KEYREPEAT ON
+KEYREPEAT OFF
+```
+
+#### Functional example
+
+```basic
+KEYREPEAT OFF
+DO
+    K$ = INKEY$
+    U$ = KEYUP$
+LOOP UNTIL U$ = "q"
+```
+
+#### See also
+
+INKEY$, KEYUP$
 
 ### MOUSEX / MOUSEY / MOUSEBUTTON
 
@@ -1299,7 +1335,7 @@ VAL, STR$, HEX$, OCT$, BIN$
 
 ### VOLUME
 
-Sets the output level of the independent BEEP, SOUND and PLAY audio buses. Values are percentages from 0 to 100. The PLAY setting multiplies the volume encoded inside ZXPLAY/PLAY music strings; it does not replace their `V0..V15` dynamics.
+Sets the output level of the independent BEEP, SOUND and PLAY audio buses. Values are percentages from 0 to 300. `100` is unity gain; values above 100 apply software gain to the synthesized waveform. The PLAY setting multiplies the volume encoded inside ZXPLAY/PLAY music strings; it does not replace their `V0..V15` dynamics.
 
 #### Syntax
 
@@ -1327,6 +1363,8 @@ PLAY BACKGROUND "T240V15O5c"
 
 - `VOLUME n` is shorthand for `VOLUME ALL n`.
 - `MUSIC` is an alias of `PLAY`.
+- `100` is unity gain; `150` is 1.5x software gain.
+- Values above unity may saturate at the signed 16-bit PCM limit if the resulting waveform exceeds full scale.
 - Volume is a host-output setting. Historical BEEP, SOUND and PLAY pitch/timing semantics remain unchanged.
 
 #### See also

@@ -76,7 +76,10 @@ A background PLAY therefore continues while BASIC executes a BEEP or queues SOUN
 
 A short-lived command-line invocation waits for queued SOUND/music after normal program completion so the final phrase is not truncated. `STOP` suspends BASIC state without discarding background music. A frontend user-abort requests music cancellation.
 
-The default backend uses Windows `winsound` where available, then common POSIX audio tools, with generated WAV/terminal-bell fallback. Music volume is honored by backends that expose amplitude control.
+The default backend uses Windows `winsound` where available, then common POSIX audio tools, with generated WAV/terminal-bell fallback. Music volume is honored by backends that expose amplitude control. BASIC bus
+volume accepts `0..300`: `100` is unity gain and values above 100 apply software
+gain before output. Synthesized 16-bit PCM is saturated at full scale rather
+than wrapping if an amplified waveform exceeds the numeric range.
 
 ## Shell commands
 
@@ -92,7 +95,7 @@ sumplay --hold --timeout 3 'T240V15O4c'
 ```
 
 `sumbeep` keeps the BASIC order `duration pitch`; `sumsound` keeps `frequency
-ticks`. All three accept `--volume 0..100`. Shell quoting is strongly advised,
+ticks`. All three accept `--volume 0..300`; `100` is unity gain. Shell quoting is strongly advised,
 especially because `#` in a PLAY string has meaning to both ZX music and the
 shell.
 
@@ -108,10 +111,27 @@ kill "$sum_audio_pid"
 wait "$sum_audio_pid" || test $? -eq 130
 ```
 
-On Android, absence of a usable PCM backend may make the terminal-bell fallback
-vibrate instead of producing audio. That is a backend limitation, not PLAY,
-BEEP, SOUND, or music-string semantics; native Android/Pygame audio remains a
-separate portability task.
+### Android / Termux
+
+On Termux, sumCore first checks for `termux-media-player`. When available it
+generates a temporary WAV tone and delegates playback to Android's native
+MediaPlayer service. This is the preferred compatibility backend because an
+unprivileged Termux process normally does not expose Android audio hardware as
+a conventional ALSA device.
+
+For F-Droid/GitHub Termux installations, install the matching Termux:API app and
+the `termux-api` package so `termux-media-player` is present. Recent Google Play
+Termux builds include this particular API command directly. Check with:
+
+```bash
+command -v termux-media-player
+```
+
+PulseAudio can still be used by other applications, but its OpenSL ES/AAudio
+sink is device/Android-version dependent. If neither native MediaPlayer nor a
+usable PCM/Pygame backend is available, Sum can still reach the terminal-bell
+fallback. This is a backend limitation, not a change to PLAY, BEEP, SOUND, or
+music-string semantics.
 
 <p align=center><b>- oOo -<b></p>
 

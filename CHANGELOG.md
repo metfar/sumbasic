@@ -1,3 +1,25 @@
+## 0.2.28
+
+- Added `KEYREPEAT ON/OFF`; GUI/Kitty repeat events can be suppressed without losing press/release, Pygame repeat generation is disabled while OFF, and legacy TTY typematic bytes remain intentionally available as a held-key heartbeat.
+- `piano_text.bas` now runs every note at 150% PLAY software gain and holds notes indefinitely until exact release or a three-window legacy terminal heartbeat timeout.
+- Corrected the piano DATA table to ZX PLAY octave numbering: displayed C3/C4/C5 now use O4/O5/O6 respectively, so their generated frequencies match scientific pitch instead of sounding one octave too low.
+- sumTUI terminal input now negotiates and decodes Kitty progressive press/repeat/release events, closing the KEYUP$ gap between `--run`, text IDE, and GUI modes on compatible terminals.
+- Direct terminal INKEY$ now splits batched printable typematic bytes into individual key values instead of returning strings such as `zzzz`.
+
+
+## 0.2.27
+
+- Improved POSIX terminal keyboard negotiation by explicitly setting Kitty progressive-keyboard flags after pushing the previous mode; exact `KEYUP$` now works on compatible terminals while legacy TTYs continue to use a documented safety-timeout fallback.
+- Tuned `piano_text.bas` for legacy terminals: the first held note has a shorter safety window and typematic repeats renew a 140 ms window, so release no longer leaves the previous multi-second tail.
+- Added low-register compensation to the piano example only: C3 starts at 2x the base PLAY bus level and the gain tapers linearly by semitone to the normal level at D4.
+- Added Termux native audio fallback through sumCore 0.1.0a7: generated WAV tones are played with `termux-media-player`/Android MediaPlayer when available.
+
+## 0.2.26
+
+- Fixed graphical text-plane mouse Y translation so clickable white and black piano keys map to the same BASIC cells.
+- Added terminal KEYUP$ support through Kitty progressive keyboard release events while preserving legacy terminal input.
+- Extended ZX PLAY octaves through O10 and coordinated the 48 kHz click-free held-note renderer from sumCore.
+
 ## 0.2.24
 
 - Moved the audio implementation and shell commands to sumCore 0.1.0a4; retained `sumbasic.audio` and `sumbasic.audio_cli` as compatible re-export modules.
