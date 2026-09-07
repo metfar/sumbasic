@@ -1,3 +1,9 @@
+## 0.2.31
+
+- Corrected GUI keyboard-repeat timing to the shared 250 ms / approximately 30 Hz policy used by sumGUI.
+- BASIC now prefers the graphical backend repeat controller for `KEYREPEAT ON/OFF`, so the piano no longer reaches behind the backend and mutates Pygame repeat state independently.
+- Restored normal GUI editor key repeat after a BASIC run finishes, preventing `KEYREPEAT OFF` examples such as `piano_text.bas` from contaminating subsequent editor input.
+
 ## 0.2.29
 
 - Made `KEYREPEAT OFF` use real-time destructive sampling on legacy POSIX TTY input: `INKEY$` keeps only the newest currently pending character and discards stale typematic backlog, preventing a released key from remaining queued across piano polls.

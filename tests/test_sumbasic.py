@@ -1616,7 +1616,23 @@ def test_sum_basic_ide_keyrepeat_off_disables_active_pygame_repeat():
     assert ide._ide_keyrepeat(False) is False;
     assert calls[-1] == (0, 0);
     assert ide._ide_keyrepeat(True) is True;
-    assert calls[-1] == (250, 31);
+    assert calls[-1] == (250, 33);
+
+
+def test_sum_basic_ide_prefers_gui_backend_repeat_controller():
+    from sumbasic.ide import SumBasicIDE;
+    calls = [];
+    class Backend:
+        pygame = object();
+        def set_key_repeat(self, enabled, delay, interval):
+            calls.append((enabled, delay, interval));
+            return (delay, interval) if enabled else (0, 0);
+    ide = SumBasicIDE(path=None);
+    ide.app._active_gui_backend = Backend();
+    assert ide._ide_keyrepeat(False) is False;
+    assert calls[-1] == (False, 250, 33);
+    assert ide._ide_keyrepeat(True) is True;
+    assert calls[-1] == (True, 250, 33);
 
 
 def test_keyrepeat_statement_controls_distinguishable_repeat_delivery():

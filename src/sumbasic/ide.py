@@ -251,9 +251,15 @@ class SumBasicIDE(ScriptIDE):
         enabled = bool(enabled);
         backend = getattr(self.app, "_active_gui_backend", None);
         pygame = getattr(backend, "pygame", None);
+        if backend is not None and hasattr(backend, "set_key_repeat"):
+            try:
+                backend.set_key_repeat(enabled, 250, 33);
+                return enabled;
+            except Exception:
+                pass;
         if pygame is not None:
             try:
-                if enabled: pygame.key.set_repeat(250, 31);
+                if enabled: pygame.key.set_repeat(250, 33);
                 else: pygame.key.set_repeat(0, 0);
             except Exception:
                 pass;
@@ -342,6 +348,7 @@ class SumBasicIDE(ScriptIDE):
         return None;
 
     def _finish_sync(self):
+        self._ide_keyrepeat(True);
         rendered = self._run_screen.text();
         error = self._run_error;
         if error is not None:
@@ -531,6 +538,7 @@ class SumBasicIDE(ScriptIDE):
             self._finish_direct_command();
             dirty = True;
         if finished:
+            self._ide_keyrepeat(True);
             rendered = self._run_screen.text();
             if error is not None:
                 message = "Error: {}".format(error);
