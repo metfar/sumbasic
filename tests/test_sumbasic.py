@@ -1685,23 +1685,17 @@ def test_terminal_inkey_keyrepeat_off_does_not_flush_kitty_press(monkeypatch):
     assert discarded == [];
 
 
-def test_terminal_keyup_does_not_backlog_legacy_typematic_when_keyrepeat_is_off(monkeypatch):
+def test_terminal_keyup_does_not_consume_legacy_typematic_when_keyrepeat_is_off(monkeypatch):
     from sumbasic.terminal_input import TerminalInput;
     terminal = TerminalInput(stream=type("Stream", (), {"fileno": lambda self: 0, "isatty": lambda self: True, "encoding": "utf-8"})());
     terminal.enabled = True;
     terminal._windows = False;
     terminal.key_repeat = False;
-    discarded = [];
-    def poll():
-        terminal._last_event_extended = False;
-        return "press", "zzzz";
-    monkeypatch.setattr(terminal, "_poll_key_event", poll);
-    monkeypatch.setattr(terminal, "_discard_legacy_pending_input", lambda: discarded.append(True));
+    polled = [];
+    monkeypatch.setattr(terminal, "_poll_key_event", lambda: polled.append(True) or ("press", "zzzz"));
     assert terminal.keyup() == "";
-    assert list(terminal._inkey_queue) == ["z"];
-    assert terminal.inkey() == "z";
+    assert polled == [];
     assert list(terminal._inkey_queue) == [];
-    assert discarded == [True];
 
 
 def test_terminal_keyup_suppresses_kitty_repeat_when_keyrepeat_is_off(monkeypatch):
@@ -1710,6 +1704,7 @@ def test_terminal_keyup_suppresses_kitty_repeat_when_keyrepeat_is_off(monkeypatc
     terminal.enabled = True;
     terminal._windows = False;
     terminal.key_repeat = False;
+    terminal._extended_keyboard_seen = True;
     def poll():
         terminal._last_event_extended = True;
         return "repeat", "z";
@@ -1730,3 +1725,22 @@ def test_play_runtime_help_documents_notes_rests_accidentals_and_dots():
     assert "dotted" in text.lower();
     assert "GW rest" in text and "P4" in text;
     assert "C4." in text and "P4." in text;
+
+
+def test_gui_keyrepeat_off_uses_physical_hold_and_exact_keyup():
+    from types import SimpleNamespace;
+    from sumtui.events import KeyEvent;
+    from sumbasic.ide import SumBasicIDE;
+    class RunningThread:
+        @staticmethod
+        def is_alive(): return True;
+    ide = SumBasicIDE(path=None);
+    ide._run_thread = RunningThread();
+    ide.basic_interpreter.key_repeat = False;
+    ide.app._active_gui_backend = SimpleNamespace(pygame=object());
+    assert ide._dispatch_event(KeyEvent(key="z", text="z", action="press")) is True;
+    assert ide._ide_inkey() == "z";
+    assert ide._ide_inkey() == "z";
+    assert ide._dispatch_event(KeyEvent(key="z", text="z", action="release")) is True;
+    assert ide.basic_interpreter._read_keyup() == "z";
+    assert ide._ide_inkey() == "";

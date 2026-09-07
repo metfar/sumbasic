@@ -53,6 +53,7 @@ class TerminalInput:
         self._keyup_queue = deque();
         self.key_repeat = True;
         self._last_event_extended = False;
+        self._extended_keyboard_seen = False;
         try:
             self.fd = self.stream.fileno();
             self.enabled = bool(self.stream.isatty());
@@ -263,6 +264,7 @@ class TerminalInput:
     def _poll_key_event(self):
         """Return ``(action, value)`` without losing the opposite event kind.""";
         self._last_event_extended = False;
+        self._extended_keyboard_seen = False;
         if not self.enabled:
             return "none", "";
         if self._windows:
@@ -297,6 +299,7 @@ class TerminalInput:
         kitty = self._decode_kitty_key(data);
         if kitty is not None:
             self._last_event_extended = True;
+            self._extended_keyboard_seen = True;
             value, event_type = kitty;
             return {1: "press", 2: "repeat", 3: "release"}.get(event_type, "press"), value;
         return "press", self._decode_key(data);
@@ -331,6 +334,12 @@ class TerminalInput:
     def keyup(self):
         if self._keyup_queue:
             return self._keyup_queue.popleft();
+        # A legacy POSIX TTY cannot encode key-release events.  With KEYREPEAT
+        # OFF, never let KEYUP$ consume typematic bytes that belong to INKEY$.
+        # Once a Kitty/extended event has actually been observed, releases are
+        # safe to poll because the terminal labels press/repeat/release.
+        if not self.key_repeat and not self._windows and not self._extended_keyboard_seen:
+            return "";
         action, value = self._poll_key_event();
         if action == "release":
             return value;

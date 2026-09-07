@@ -150,6 +150,7 @@ class SumBasicIDE(ScriptIDE):
         self._run_lock = threading.Lock();
         self._inkey_queue = queue.Queue();
         self._keyup_queue = queue.Queue();
+        self._gui_held_keys = [];
         self._direct_basic_thread = None;
         self._direct_basic_output_buffer = "";
         self._direct_basic_finished = False;
@@ -231,6 +232,8 @@ class SumBasicIDE(ScriptIDE):
         try:
             value = self._inkey_queue.get_nowait();
         except queue.Empty:
+            if not getattr(self.basic_interpreter, "key_repeat", True) and self._gui_held_keys:
+                return self._gui_held_keys[-1];
             return "";
         if not getattr(self.basic_interpreter, "key_repeat", True):
             while True:
@@ -276,17 +279,25 @@ class SumBasicIDE(ScriptIDE):
                 return True;
         if running and isinstance(event, KeyEvent):
             action = getattr(event, "action", "press");
+            backend = getattr(self.app, "_active_gui_backend", None);
+            pygame = getattr(backend, "pygame", None);
+            gui_physical = pygame is not None;
+            printable = "";
+            if event.key == Key.ESCAPE: printable = chr(27);
+            elif event.key == Key.SPACE: printable = " ";
+            elif event.text and not event.ctrl and not event.alt: printable = event.text;
+            elif len(str(event.key)) == 1 and not event.ctrl and not event.alt: printable = str(event.key);
             if action == "repeat" and not getattr(self.basic_interpreter, "key_repeat", True): return True;
             if action == "release":
-                if event.key == Key.ESCAPE: return self.basic_interpreter.queue_keyup(chr(27));
-                if event.key == Key.SPACE: return self.basic_interpreter.queue_keyup(" ");
-                if event.text and not event.ctrl and not event.alt: return self.basic_interpreter.queue_keyup(event.text);
-                if len(str(event.key)) == 1 and not event.ctrl and not event.alt: return self.basic_interpreter.queue_keyup(str(event.key));
+                if gui_physical and printable:
+                    self._gui_held_keys = [item for item in self._gui_held_keys if item != printable];
+                if printable: return self.basic_interpreter.queue_keyup(printable);
                 return True;
-            if event.key == Key.ESCAPE:
-                return self._queue_program_key(chr(27));
-            if event.text and not event.ctrl and not event.alt:
-                return self._queue_program_key(event.text);
+            if action == "press" and gui_physical and printable:
+                self._gui_held_keys = [item for item in self._gui_held_keys if item != printable];
+                self._gui_held_keys.append(printable);
+            if printable:
+                return self._queue_program_key(printable);
         return self._application_dispatch(event);
 
     def _prepare_run(self):
@@ -302,6 +313,7 @@ class SumBasicIDE(ScriptIDE):
                 self._keyup_queue.get_nowait();
             except queue.Empty:
                 break;
+        self._gui_held_keys = [];
         with self._run_lock:
             self._basic_output_buffer = "";
             self._run_dirty = True;
