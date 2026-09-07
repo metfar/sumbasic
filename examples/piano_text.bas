@@ -11,9 +11,9 @@ NEXT I!
 BaseVolume! = 150
 VOLUME PLAY BaseVolume!
 KEYREPEAT OFF
-PollPause! = .04
-InitialGracePolls! = 15
-ReleaseMissLimit! = 3
+PollPause! = .05
+InitialGracePolls! = 10
+ReleaseMissLimit! = 5
 MissedPolls! = 0
 GracePolls! = 0
 RepeatSeen! = 0
@@ -129,7 +129,7 @@ DO
 
     # Legacy terminal fallback: give the OS typematic delay time to start.
     # Once repeats have been observed, three keyboard polls without seeing the
-    # same held key are considered a release.
+    # same held key are considered a release (5 x 50 ms = 250 ms).
     IF HeldSource$ = "keyboard" AND Released$ = "" THEN
         IF K$ = Held$ AND K$ <> "" THEN
             MissedPolls! = 0
