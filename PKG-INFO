@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.31
+Version: 0.2.32
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -17,6 +17,8 @@ Requires-Dist: sumide>=0.2.20
 Requires-Dist: sumx>=0.2.17
 Requires-Dist: sumdata>=0.1.0a1
 Requires-Dist: sumplot>=0.1.0a1
+Requires-Dist: sumfsa>=0.1.0a1
+Requires-Dist: sumio>=0.1.0a1
 Requires-Dist: rich>=13.0
 Provides-Extra: graphics
 Requires-Dist: sumgui>=0.2.0a20; extra == "graphics"

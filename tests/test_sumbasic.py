@@ -1760,3 +1760,12 @@ def test_gui_keyrepeat_off_uses_physical_hold_and_exact_keyup():
     assert ide._dispatch_event(KeyEvent(key="z", text="z", action="release")) is True;
     assert ide.basic_interpreter._read_keyup() == "z";
     assert ide._ide_inkey() == "";
+
+
+def test_lof_unknown_stream_is_minus_one():
+    import io;
+    from sumbasic.channels import ChannelManager;
+    manager=ChannelManager(stdin=io.StringIO('Ada\n'));
+    manager.open('STDIN','input',1);
+    assert manager.lof(1)==-1;
+    manager.close(1);

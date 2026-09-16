@@ -15,6 +15,9 @@ import subprocess;
 import sys;
 from dataclasses import dataclass, field;
 
+from sumfsa import FileSystem;
+from sumio import Capability, StreamResource, open_resource;
+
 
 class ChannelError(RuntimeError):
     pass;
@@ -52,22 +55,27 @@ class BasicChannel:
     fields: list = field(default_factory=list);
     process: object = None;
     owned: bool = True;
+    resource: object = None;
 
     def close(self):
-        if self.owned and self.stream is not None:
+        if self.resource is not None and self.owned:
+            try: self.resource.close();
+            except Exception: pass;
+        elif self.owned and self.stream is not None:
             try: self.stream.close();
             except Exception: pass;
         if self.process is not None:
             try: self.process.wait(timeout=1.0);
             except Exception: pass;
-        self.stream = None;
+        self.stream=None; self.resource=None;
 
 
 class ChannelManager:
-    def __init__(self, stdin=None, stdout=None, stderr=None):
+    def __init__(self, stdin=None, stdout=None, stderr=None, filesystem=None):
         self.stdin = stdin if stdin is not None else sys.stdin;
         self.stdout = stdout if stdout is not None else sys.stdout;
         self.stderr = stderr if stderr is not None else sys.stderr;
+        self.filesystem = filesystem if filesystem is not None else FileSystem(cwd=os.getcwd(),home=os.path.expanduser("~"));
         self.channels = {};
 
     def close_all(self):
@@ -102,41 +110,35 @@ class ChannelManager:
         return result;
 
     def open(self, source, mode, number, record_length=0, encoding="utf-8"):
-        number = channel_number(number);
+        number=channel_number(number);
         if number in self.channels: raise ChannelError("Channel #{} is already open".format(number));
-        raw_source = str(source);
-        key_source = raw_source.strip().casefold();
-        key_mode = str(mode).strip().lower();
-        random_access = key_mode == "random";
-        binary = random_access or key_mode == "binary" or "b" in key_mode;
-        stream = None; process = None; owned = True;
-        if key_source in ("stdin", "stdin:"):
-            if key_mode not in ("input", "r", "rb"): raise ChannelError("STDIN is input-only");
-            stream = getattr(self.stdin, "buffer", self.stdin) if binary else self.stdin; owned = False;
-        elif key_source in ("stdout", "stdout:"):
-            if key_mode in ("input", "r", "rb"): raise ChannelError("STDOUT is output-only");
-            stream = getattr(self.stdout, "buffer", self.stdout) if binary else self.stdout; owned = False;
-        elif key_source in ("stderr", "stderr:"):
-            if key_mode in ("input", "r", "rb"): raise ChannelError("STDERR is output-only");
-            stream = getattr(self.stderr, "buffer", self.stderr) if binary else self.stderr; owned = False;
+        raw_source=str(source); key_source=raw_source.strip().casefold(); key_mode=str(mode).strip().lower(); random_access=key_mode=="random"; binary=random_access or key_mode=="binary" or "b" in key_mode;
+        stream=None; process=None; owned=True; resource=None;
+        if key_source in ("stdin","stdin:"):
+            if key_mode not in ("input","r","rb"): raise ChannelError("STDIN is input-only");
+            stream=getattr(self.stdin,"buffer",self.stdin) if binary else self.stdin; owned=False; resource=StreamResource(stream,"stdin",readable=True,writable=False,close_stream=False);
+        elif key_source in ("stdout","stdout:"):
+            if key_mode in ("input","r","rb"): raise ChannelError("STDOUT is output-only");
+            stream=getattr(self.stdout,"buffer",self.stdout) if binary else self.stdout; owned=False; resource=StreamResource(stream,"stdout",readable=False,writable=True,close_stream=False);
+        elif key_source in ("stderr","stderr:"):
+            if key_mode in ("input","r","rb"): raise ChannelError("STDERR is output-only");
+            stream=getattr(self.stderr,"buffer",self.stderr) if binary else self.stderr; owned=False; resource=StreamResource(stream,"stderr",readable=False,writable=True,close_stream=False);
         elif raw_source.startswith("|") or raw_source.endswith("|"):
-            command = raw_source.strip("|").strip();
+            command=raw_source.strip("|").strip();
             if not command: raise ChannelError("Pipeline command is empty");
-            if key_mode in ("input", "r", "rb"):
-                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=not binary);
-                stream = process.stdout;
-            elif key_mode in ("output", "append", "w", "a", "wb", "ab"):
-                process = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, text=not binary);
-                stream = process.stdin;
-            else:
-                raise ChannelError("Pipeline supports INPUT/OUTPUT modes");
+            if key_mode in ("input","r","rb"):
+                process=subprocess.Popen(command,shell=True,stdout=subprocess.PIPE,text=not binary); stream=process.stdout; resource=StreamResource(stream,"pipe:{}".format(command),readable=True,writable=False,close_stream=True);
+            elif key_mode in ("output","append","w","a","wb","ab"):
+                process=subprocess.Popen(command,shell=True,stdin=subprocess.PIPE,text=not binary); stream=process.stdin; resource=StreamResource(stream,"pipe:{}".format(command),readable=False,writable=True,close_stream=True);
+            else: raise ChannelError("Pipeline supports INPUT/OUTPUT modes");
+        elif key_source.startswith("serial:"):
+            py_mode=self._python_mode(key_mode,binary=True); resource=open_resource(raw_source,py_mode,filesystem=self.filesystem); stream=getattr(resource,"serial",resource); binary=True;
         else:
-            py_mode = self._python_mode(key_mode, binary=binary);
-            if random_access and not os.path.exists(raw_source): py_mode = "w+b";
-            stream = open(raw_source, py_mode, encoding=None if "b" in py_mode else encoding);
-        channel = BasicChannel(number, stream, key_mode, raw_source, binary=binary, random=random_access, record_length=max(0, int(record_length or 0)), process=process, owned=owned);
-        self.channels[number] = channel;
-        return channel;
+            py_mode=self._python_mode(key_mode,binary=binary); logical=self.filesystem.normalize(raw_source);
+            if random_access and not self.filesystem.exists(logical): py_mode="w+b";
+            resource=open_resource(logical,py_mode,filesystem=self.filesystem,encoding=encoding); stream=getattr(resource,"stream",resource);
+        channel=BasicChannel(number,stream,key_mode,raw_source,binary=binary,random=random_access,record_length=max(0,int(record_length or 0)),process=process,owned=owned,resource=resource);
+        self.channels[number]=channel; return channel;
 
     def define_fields(self, spec, definitions):
         channel = self.get(spec);
@@ -175,26 +177,31 @@ class ChannelManager:
         return [item[1:-1] if len(item) >= 2 and item[0] == item[-1] == '"' else item for item in values];
 
     def eof(self, spec):
-        channel = self.get(spec); stream = channel.stream;
-        if not hasattr(stream, "tell") or not hasattr(stream, "seek"):
-            return False;
-        try:
-            here = stream.tell(); data = stream.read(1); stream.seek(here); return data in ("", b"");
-        except (OSError, io.UnsupportedOperation): return False;
+        channel=self.get(spec); resource=channel.resource;
+        if resource is not None and (resource.capabilities & Capability.READ) and (resource.capabilities & Capability.SEEK) and (resource.capabilities & Capability.TELL):
+            try:
+                here=resource.tell(); result=resource.read_result(1); resource.seek(here); return bool(result.eof);
+            except Exception: return False;
+        stream=channel.stream;
+        if not hasattr(stream,"tell") or not hasattr(stream,"seek"): return False;
+        try: here=stream.tell(); data=stream.read(1); stream.seek(here); return data in ("",b"");
+        except (OSError,io.UnsupportedOperation): return False;
 
     def lof(self, spec):
-        channel = self.get(spec); stream = channel.stream;
-        try:
-            here = stream.tell(); stream.seek(0, os.SEEK_END); size = stream.tell(); stream.seek(here); return size;
-        except (OSError, io.UnsupportedOperation): return 0;
+        channel=self.get(spec); resource=channel.resource;
+        if resource is not None:
+            try:
+                value=resource.length(); return -1 if value is None else int(value);
+            except Exception: return -1;
+        return -1;
 
     def loc(self, spec):
-        channel = self.get(spec);
+        channel=self.get(spec); resource=channel.resource;
         try:
-            pos = channel.stream.tell();
-            if channel.random and channel.record_length: return (pos // channel.record_length) + 1;
+            pos=resource.tell() if resource is not None and (resource.capabilities & Capability.TELL) else channel.stream.tell();
+            if channel.random and channel.record_length: return (pos // channel.record_length)+1;
             return pos;
-        except (OSError, io.UnsupportedOperation): return 0;
+        except (OSError,io.UnsupportedOperation): return 0;
 
     def get_record(self, spec, record_number):
         channel = self.get(spec);

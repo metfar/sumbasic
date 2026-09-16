@@ -1,3 +1,11 @@
+## 0.2.32
+
+- File channels now open regular files through `sumFSA` + `sumIO`.
+- Standard streams and subprocess pipe endpoints are represented by common `sumIO` resources while preserving the existing BASIC channel API.
+- `LOF()` returns `-1` when the underlying resource has no meaningful/known length instead of inventing zero.
+- Random-file `FIELD` / `GET` / `PUT` behavior remains unchanged.
+- Added the first `serial:` resource path through the common I/O opener; `pyserial` remains optional in sumIO.
+
 ## 0.2.31
 
 - Corrected GUI keyboard-repeat timing to the shared 250 ms / approximately 30 Hz policy used by sumGUI.
