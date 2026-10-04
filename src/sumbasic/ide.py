@@ -42,6 +42,7 @@ from sumui import CursorState, TextScreen, coerce_cursor_state;
 class _VirtualRunScreen:
     """Small ANSI-aware screen for CLS/LOCATE output in the IDE pane.""";
     _LOCATE_RE = re.compile(r"^\x1b\[(\d+);(\d+)H");
+    _SGR_RE = re.compile(r"^\x1b\[([0-9;]*)m");
 
     def __init__(self):
         self._lock = threading.Lock();
@@ -50,6 +51,9 @@ class _VirtualRunScreen:
     def clear(self):
         with getattr(self, "_lock", threading.Lock()):
             self._rows = [""];
+            self._styles = [[]];
+            self._foreground = None;
+            self._background = None;
             self._row = 0;
             self._col = 0;
             if not hasattr(self, "_cursor_state"): self._cursor_state = CursorState.NORMAL;
@@ -66,11 +70,15 @@ class _VirtualRunScreen:
     def _ensure_row(self, row):
         while len(self._rows) <= row:
             self._rows.append("");
+            self._styles.append([]);
         return None;
 
     def _put(self, char):
         self._ensure_row(self._row);
         line = self._rows[self._row];
+        styles = self._styles[self._row];
+        if len(styles) < self._col:
+            styles.extend([(None, None)] * (self._col - len(styles)));
         if len(line) < self._col:
             line += " " * (self._col - len(line));
         if self._col < len(line):
@@ -78,6 +86,9 @@ class _VirtualRunScreen:
         else:
             line += char;
         self._rows[self._row] = line;
+        attribute = (self._foreground, self._background);
+        if self._col < len(styles): styles[self._col] = attribute;
+        else: styles.append(attribute);
         self._col += 1;
         return None;
 
@@ -88,6 +99,7 @@ class _VirtualRunScreen:
             while index < len(data):
                 if data.startswith("\x1b[2J", index):
                     self._rows = [""];
+                    self._styles = [[]];
                     self._row = 0;
                     self._col = 0;
                     index += 4;
@@ -98,6 +110,19 @@ class _VirtualRunScreen:
                     index += 3;
                     continue;
                 if data.startswith("\x1b[", index):
+                    sgr = self._SGR_RE.match(data[index:]);
+                    if sgr:
+                        codes = [int(item) if item else 0 for item in sgr.group(1).split(";")];
+                        for code in codes:
+                            if code == 0: self._foreground = None; self._background = None;
+                            elif code == 39: self._foreground = None;
+                            elif code == 49: self._background = None;
+                            elif 30 <= code <= 37: self._foreground = code;
+                            elif 90 <= code <= 97: self._foreground = code;
+                            elif 40 <= code <= 47: self._background = code;
+                            elif 100 <= code <= 107: self._background = code;
+                        index += sgr.end();
+                        continue;
                     match = self._LOCATE_RE.match(data[index:]);
                     if match:
                         self._row = max(0, int(match.group(1)) - 1);
@@ -120,6 +145,15 @@ class _VirtualRunScreen:
                     self._put(char);
                 index += 1;
         return None;
+
+    def styled_rows(self):
+        """Snapshot of text attributes per cell for a terminal-independent renderer.""";
+        with self._lock:
+            rows = list(self._rows);
+            attributes = [list(row) for row in self._styles];
+        while len(rows) > 1 and rows[-1] == "":
+            rows.pop(); attributes.pop();
+        return [(row, attrs) for row, attrs in zip(rows, attributes)];
 
     def text(self, include_cursor=False):
         with self._lock:
@@ -528,6 +562,7 @@ class SumBasicIDE(ScriptIDE):
             rendered = self._run_screen.text(include_cursor=True);
             if rendered:
                 self.output_view.set_text(rendered);
+                self.output_view.set_styled_rows(self._run_screen.styled_rows());
                 self._scroll_output_end();
         if shell_output_pending:
             self.workspace.show(self.output_window);
@@ -553,6 +588,7 @@ class SumBasicIDE(ScriptIDE):
             else:
                 self.output_view.set_text(rendered if rendered else "Program finished with no text output.");
                 self._update_status("Run complete. F5 executes the current editor buffer, saved or not.");
+            if rendered: self.output_view.set_styled_rows(self._run_screen.styled_rows());
             self._scroll_output_end();
             self._run_thread = None;
             with self._run_lock:

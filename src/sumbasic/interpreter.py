@@ -1786,7 +1786,25 @@ class BasicInterpreter:
                 raise BasicError("COLOR accepts foreground [, background [, border]]");
             while len(values) < 3:
                 values.append(None);
-            self.graphics.emit("color", tuple(values));
+            if self.graphics.mode is None:
+                # In text mode COLOR changes terminal attributes; it must not
+                # implicitly create a pygame graphics surface.
+                foreground, background, _border = values;
+                fg_codes = (30, 34, 32, 36, 31, 35, 33, 37,
+                            90, 94, 92, 96, 91, 95, 93, 97);
+                bg_codes = (40, 44, 42, 46, 41, 45, 43, 47,
+                            100, 104, 102, 106, 101, 105, 103, 107);
+                codes = [];
+                if foreground is not None:
+                    codes.append(fg_codes[int(foreground) % 16]);
+                if background is not None:
+                    codes.append(bg_codes[int(background) % 16]);
+                if codes:
+                    self._emit("\033[{}m".format(";".join(map(str, codes))), end="");
+                if _border is not None:
+                    self.border_color = int(_border);
+            else:
+                self.graphics.emit("color", tuple(values));
             return True;
         match = re.match(r"^(PAINT|FILL)\s*(?:\(\s*(.+?)\s*,\s*(.+?)\s*\)|(.+?)\s*,\s*(.+?))(?:\s*,\s*(.+?))?(?:\s*,\s*(.+))?$", raw, re.I);
         if match:

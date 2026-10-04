@@ -1,4 +1,4 @@
-# sumBASIC 0.2.33
+# sumBASIC 0.2.1
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -595,3 +595,7 @@ an initial grace period, three polling windows without the held key are treated
 as release.
 
 <p align=center><b>- oOo -</b></p>
+
+## Coloured text output (0.2.35)
+
+ANSI SGR colours are represented as display attributes, not printed escape sequences. The BASIC IDE preserves colours in its F5 output screen and respects LOCATE overwrites.
