@@ -103,6 +103,11 @@ def _run_loaded(interpreter, interactive_terminal=False):
     except (BasicError, GraphicsBackendError) as exc:
         print("sumBASIC error: {}".format(exc), file=sys.stderr);
         return 1;
+    finally:
+        exporter = getattr(interpreter, "tone_func", None);
+        closer = getattr(exporter, "close", None);
+        if callable(closer):
+            closer();
 
 
 
@@ -122,6 +127,9 @@ def build_parser():
     parser.add_argument("program_args", nargs=argparse.REMAINDER, help="arguments after FILE passed to COMMAND$/ARGS$/ARGV$() inside BASIC");
     parser.add_argument("-c", "--command", dest="command", help="execute BASIC source supplied directly on the command line");
     parser.add_argument("--run", action="store_true", help="run a BASIC program");
+    parser.add_argument("--audio-output", default=None, metavar="PATH|-", help="render program audio to WAV file or raw PCM stdout");
+    parser.add_argument("--audio-format", choices=("wav","raw"), default=None, help="WAV file or signed 16-bit mono PCM");
+    parser.add_argument("--audio-rate", type=int, default=48000, help="PCM sample rate (default: 48000)");
     parser.add_argument("--check", action="store_true", help="validate program structure and recognized statements without running it");
     parser.add_argument("--plain", action="store_true", help="use the plain terminal REPL instead of the Sum UI");
     add_backend_arguments(parser);
@@ -142,13 +150,21 @@ def main(argv=None):
     if args.program_args and not (args.file and args.run):
         parser.error("arguments after FILE require --run; put sumBASIC options before the filename");
     if args.file and not (args.run or args.check): return _edit_file(args.file, backend=ui_backend);
-    if args.file and args.run and ui_backend == "gui" and not _source_uses_graphics(args.file):
-        if args.program_args:
-            return _edit_file(args.file, backend="gui", run=True, program_args=args.program_args);
-        return _edit_file(args.file, backend="gui", run=True);
+    # --run executes directly; the editor is only entered without --run.
     if not args.file and args.command is None and not args.run and not args.check and not args.plain and (ui_backend == "gui" or bool(getattr(sys.stdin, "isatty", lambda: False)())):
         return _edit_file(None, backend=ui_backend);
-    interpreter = BasicInterpreter(output_func=_stdout_output, graphics_handler=SumGuiGraphicsHandler(), text_screen=TerminalTextScreen());
+    needs_graphics = bool(args.file and _source_uses_graphics(args.file)) if (args.run or args.check) else ui_backend == "gui";
+    graphics_handler = SumGuiGraphicsHandler() if needs_graphics else None;
+    audio_export = None;
+    if args.audio_output is not None:
+        from sumcore.audio_export import AudioExport;
+        audio_format = args.audio_format or ("raw" if args.audio_output == "-" else "wav");
+        try:
+            audio_export = AudioExport(args.audio_output, audio_format, args.audio_rate);
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc));
+    output = (lambda value="", end="\n": print(str(value), end=end, file=sys.stderr, flush=True)) if args.audio_output == "-" else _stdout_output;
+    interpreter = BasicInterpreter(output_func=output, tone_func=audio_export, graphics_handler=graphics_handler, text_screen=TerminalTextScreen());
     interpreter.set_program_args(args.program_args if args.file else []);
     if args.command is not None:
         interpreter.program.load_text(str(args.command) + ("" if str(args.command).endswith("\n") else "\n"));

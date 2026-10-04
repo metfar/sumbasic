@@ -26,6 +26,7 @@ import threading;
 import time;
 from pathlib import Path;
 
+from sumcore.stream import StreamPlayer;
 from .audio import AudioEngine, GW_BASIC_SOUND_MAX_HZ, GW_BASIC_SOUND_MIN_HZ, MusicParseError, gw_ticks_to_seconds, spectrum_frequency_pitch, spectrum_pitch_frequency;
 from .channels import ChannelManager, channel_number;
 from .database import BasicDatabase;
@@ -82,6 +83,7 @@ class BasicInterpreter:
         self.shell_output_func = shell_output_func;
         self.sleep_func = sleep_func if sleep_func is not None else time.sleep;
         self.audio = AudioEngine(tone_func=tone_func, sleep_func=self.sleep_func);
+        self.stream = StreamPlayer();
         self.graphics = GraphicsRuntime(handler=graphics_handler);
         self.text_screen = text_screen if text_screen is not None else TextScreen(size_provider=self._default_text_size, fallback=(80,25));
         self.patterns = {};
@@ -115,9 +117,11 @@ class BasicInterpreter:
             "GHEIGHT": lambda: self._gheight(),
             "GCOLORS": lambda: self._gcolors(),
             "CURSOR": lambda: self._cursor_value(),
+            "ISSTREAMING": lambda: self.stream.active(),
             "READRDS": lambda path: read_rds(path),
             "SAVERDS": lambda path, value: save_rds(path, value),
         }, now_func=now_func);
+        self.user_functions = {};
         self.gosub_stack = [];
         self.for_stack = [];
         self.data = [];
@@ -159,6 +163,7 @@ class BasicInterpreter:
         return count;
 
     def reset_runtime(self):
+        self.stream.close();
         self.channels.close_all();
         self.variables.clear();
         self.variable_types.clear();
@@ -516,6 +521,84 @@ class BasicInterpreter:
     def can_continue(self):
         return self._resume_context is not None;
 
+    _function_header = re.compile(r"^FUNCTION\s+([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*\((.*?)\)\s*$", re.I);
+    _function_declare = re.compile(r"^DECLARE\s+FUNCTION\s+([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*\((.*?)\)\s*$", re.I);
+
+    def _parse_function_args(self, raw):
+        names = [];
+        for item in self._split_top_level(raw, separators=",", keep_empty=False):
+            match = re.fullmatch(r"(?:BYVAL\s+|BYREF\s+)?([A-Za-z_][A-Za-z0-9_]*[$%&!]?)\s*(?:AS\s+(?:STRING|INTEGER|LONG|SINGLE|DOUBLE))?", item.strip(), re.I);
+            if not match:
+                raise BasicError("Invalid FUNCTION parameter: {}".format(item));
+            names.append(match.group(1));
+        if len({name.upper() for name in names}) != len(names):
+            raise BasicError("Duplicate FUNCTION parameter");
+        return names;
+
+    def _prepare_user_functions(self, execution):
+        for previous in self.user_functions:
+            self.expr.extra_functions.pop(previous, None);
+        self.user_functions.clear();
+        declarations = {};
+        active = None;
+        for pc, (line_number, statement) in enumerate(execution):
+            text = statement.strip();
+            declaration = self._function_declare.fullmatch(text);
+            definition = self._function_header.fullmatch(text);
+            if declaration:
+                name = declaration.group(1).upper();
+                signature = self._parse_function_args(declaration.group(2));
+                if name in declarations and declarations[name] != len(signature):
+                    raise BasicError("Conflicting declaration for {}".format(name));
+                declarations[name] = len(signature);
+                execution[pc] = (line_number, "REM FUNCTION DECLARATION");
+            elif definition:
+                if active is not None: raise BasicError("Nested FUNCTION definitions are not supported");
+                name = definition.group(1).upper();
+                if name in self.user_functions: raise BasicError("Duplicate FUNCTION {}".format(name));
+                args = self._parse_function_args(definition.group(2));
+                if name in declarations and declarations[name] != len(args):
+                    raise BasicError("Declaration mismatch for {}".format(name));
+                active = [name, args, pc, line_number];
+                execution[pc] = (line_number, "REM FUNCTION START");
+            elif text.upper() == "END FUNCTION":
+                if active is None: raise BasicError("END FUNCTION without FUNCTION");
+                name, args, first, start_line = active;
+                body = execution[first + 1:pc];
+                self.user_functions[name] = (args, body);
+                for index in range(first + 1, pc + 1):
+                    number, _ = execution[index];
+                    execution[index] = (number, "REM FUNCTION BODY");
+                active = None;
+        if active is not None: raise BasicError("FUNCTION without END FUNCTION at line {}".format(active[3]));
+        for name in declarations:
+            if name not in self.user_functions: raise BasicError("Declared FUNCTION {} has no definition".format(name));
+        for name in self.user_functions:
+            self.expr.extra_functions[name] = (lambda *values, function=name: self._call_user_function(function, values));
+
+    def _call_user_function(self, name, values):
+        args, body = self.user_functions[name];
+        if len(values) != len(args):
+            raise BasicError("FUNCTION {} expects {} arguments".format(name, len(args)));
+        # A local scope for scalar variables and loop frames; shared arrays persist.
+        previous_variables = self.variables.copy();
+        previous_stack = self.for_stack;
+        self.for_stack = [];
+        try:
+            for key, value in zip(args, values): self.expr.set(key, value);
+            self.expr.set(name, "" if name.endswith("$") else 0);
+            context = (body, {}, self._match_blocks(body, "IF", "END IF", else_word="ELSE"), self._match_blocks(body, "WHILE", "WEND"), self._match_blocks(body, "DO", "LOOP"));
+            pc = 0;
+            while pc < len(body):
+                self._stop_if_requested();
+                number, statement = body[pc];
+                pc = self._execute_statement(statement, pc, number, *context);
+            return self.expr.get(name);
+        finally:
+            self.variables.clear();
+            self.variables.update(previous_variables);
+            self.for_stack = previous_stack;
+
     def _execute_context(self, context, pc):
         execution, line_to_pc, block_if, while_blocks, do_blocks = context;
         self.stopped_by_statement = False;
@@ -579,6 +662,8 @@ class BasicInterpreter:
             r'^RANDOMIZE(?:\s+.+)?$', r'^PAUSE\s+.+$', r'^KEYREPEAT\s+(?:ON|OFF)$', r'^VOLUME\s+.+$', r'^BEEP\s+.+$', r'^SOUND\s+.+$', r'^SHELL\s+.+$',
             r'^(?:PLAY|ZXPLAY|GWPLAY)\s+.+$',
         );
+        if re.match(r"^(?:STREAM(?:STOP|CONT|START|CLOSE|END)|ISSTREAMING)$", upper): return True;
+        if re.match(r"^(?:PLAY\s+STREAM|STREAM\s+PLAY|STREAMPLAY)\s+.+$", text, re.I): return True;
         if upper.startswith("PRINT") or text.startswith("?"): return True;
         if any(re.match(pattern, text, re.I) for pattern in patterns):
             if re.match(r"^(?:PLAY|ZXPLAY|GWPLAY)\s+", text, re.I):
@@ -611,6 +696,7 @@ class BasicInterpreter:
     def check(self):
         """Validate block structure and runtime statement recognition without executing."""
         execution, line_to_pc = self._build_execution();
+        self._prepare_user_functions(execution);
         self._match_blocks(execution, "IF", "END IF", else_word="ELSE");
         self._match_blocks(execution, "WHILE", "WEND");
         self._match_blocks(execution, "DO", "LOOP");
@@ -633,6 +719,7 @@ class BasicInterpreter:
         self.reset_runtime();
         self._install_program_args();
         execution, line_to_pc = self._build_execution();
+        self._prepare_user_functions(execution);
         self._scan_data(execution);
         context = (
             execution,
@@ -824,7 +911,26 @@ class BasicInterpreter:
         text = source.strip();
         upper = text.upper();
         if not text or upper.startswith("REM ") or upper == "REM": return pc + 1;
-        if upper in ("END", "SYSTEM"): raise _StopProgram();
+        if upper in ("STREAMSTOP", "STREAMCLOSE", "STREAMEND"):
+            if upper == "STREAMSTOP": self.stream.stop();
+            else: self.stream.close();
+            return pc + 1;
+        if upper in ("STREAMCONT", "STREAMSTART"):
+            try: self.stream.cont(blocking=False);
+            except RuntimeError as exc: raise BasicError(str(exc)) from exc;
+            return pc + 1;
+        stream_match = re.match(r"^(?:PLAY\s+STREAM|STREAM\s+PLAY|STREAMPLAY)\s+(.+)$", text, re.I);
+        if stream_match:
+            args = self._split_top_level(stream_match.group(1), separators=",", keep_empty=False);
+            if not 1 <= len(args) <= 2: raise BasicError("STREAMPLAY requires URL [, ASYNC]");
+            async_mode = len(args) == 2 and args[1].strip().upper() in ("ASYNC", "BACKGROUND");
+            if len(args) == 2 and not async_mode: raise BasicError("STREAMPLAY second argument must be ASYNC");
+            try: self.stream.play(str(self.expr.eval(args[0])), blocking=not async_mode);
+            except RuntimeError as exc: raise BasicError(str(exc)) from exc;
+            return pc + 1;
+        if upper in ("END", "SYSTEM"):
+            self.stream.close();
+            raise _StopProgram();
         if upper == "STOP": raise _BasicStop(pc + 1, line_number);
         if upper == "SHELL":
             self._shell_interactive();

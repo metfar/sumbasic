@@ -28,6 +28,7 @@ from datetime import datetime;
 from decimal import Decimal;
 
 from .types import coerce_value, suffix_type;
+from sumcore.charset import asc_character;
 from .vocabulary import ZX_SPECTRUM_PI;
 
 
@@ -303,7 +304,7 @@ class ExpressionEvaluator:
             "LEN": lambda x: len(x) if hasattr(x, "__len__") else len(str(x)),
             "ASC": lambda x: ord(str(x)[0]) if str(x) else 0,
             "CODE": lambda x: ord(str(x)[0]) if str(x) else 0,
-            "CHR$": lambda x: chr(int(x) & 0xff),
+            "CHR$": lambda x: asc_character(int(x) & 0xff),
             "LCASE$": lambda x: str(x).lower(),
             "UCASE$": lambda x: str(x).upper(),
             "LEFT$": lambda x, n: str(x)[:int(n)],
