@@ -1,4 +1,4 @@
-# sumBASIC 0.2.1
+# sumBASIC 0.2.33
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
