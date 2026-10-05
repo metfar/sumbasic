@@ -594,8 +594,21 @@ mouse/touch release. On legacy TTYs, typematic repeats act as a heartbeat: after
 an initial grace period, three polling windows without the held key are treated
 as release.
 
-<p align=center><b>- oOo -</b></p>
 
 ## Coloured text output (0.2.35)
 
 ANSI SGR colours are represented as display attributes, not printed escape sequences. The BASIC IDE preserves colours in its F5 output screen and respects LOCATE overwrites.
+
+## Zero-based shared string functions
+
+sumBASIC deliberately indexes arrays and strings from zero. `MID$(text,0,1)` returns the first character and `INSTR` returns a zero-based position or `-1` when no match exists. `REPEAT$`, extended trims, `LIKE`/`ILIKE`, and the shared formatting functions are provided by `sumcore`.
+
+```basic
+PRINT MID$("abcdef", 0, 1)
+PRINT INSTR("abcdef", "cd")
+PRINT REPEAT$("ab", 3)
+PRINT NUMFORMAT(5, "$ 0000.00")
+PRINT BOOLFORMAT(NULL, "NO|SI|OMITIDO")
+```
+
+<p align=center><b>- oOo -</b></p>

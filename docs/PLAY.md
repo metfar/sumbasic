@@ -192,3 +192,5 @@ PRINT "music continues"
 ### Octave numbering
 
 ZX Spectrum `PLAY` octave numbers are one higher than modern scientific pitch labels: `O5c` is middle C (`C4`, about 261.63 Hz), `O4c` is `C3`, and `O6c` is `C5`. Examples that display scientific note names should account for that offset.
+
+<p align=center><b>- oOo -</b></p>

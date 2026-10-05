@@ -29,6 +29,8 @@ from decimal import Decimal;
 
 from .types import coerce_value, suffix_type;
 from sumcore.charset import asc_character;
+from sumcore.text import repeat, left, right, mid, instr, ltrim, rtrim, trim, alltrim, like, ilike;
+from sumcore.formatting import numformat, dateformat, textformat, boolformat;
 from .vocabulary import ZX_SPECTRUM_PI;
 
 
@@ -208,6 +210,9 @@ class ExpressionEvaluator:
         if upper in ("TRUE", "__BASIC_TRUE"): return -1;
         if upper in ("FALSE", "__BASIC_FALSE"): return 0;
         if upper in ("NULL", "NIL", "NONE", "__BASIC_NULL"): return None;
+        if upper in ("CURRENCY","PERCENT","SCIENTIFIC","GENERAL","NUMBER","INTEGER","DECIMAL2"): return upper.casefold().replace("decimal2","number.decimal2");
+        if upper in ("DATE_ISO","DATE_ES","DATE_UK","DATE_US"): return upper.casefold().replace("_",".");
+        if upper in ("TRUEFALSE","YESNO","ONOFF"): return "boolean."+upper.casefold();
         key = self.key(name);
         if key in self.variables: return self.variables[key];
         if str(name).endswith("$"): return "";
@@ -307,10 +312,19 @@ class ExpressionEvaluator:
             "CHR$": lambda x: asc_character(int(x) & 0xff),
             "LCASE$": lambda x: str(x).lower(),
             "UCASE$": lambda x: str(x).upper(),
-            "LEFT$": lambda x, n: str(x)[:int(n)],
-            "RIGHT$": lambda x, n: str(x)[-int(n):] if int(n) else "",
-            "LTRIM$": lambda x: str(x).lstrip(),
-            "RTRIM$": lambda x: str(x).rstrip(),
+            "LEFT$": lambda x, n: left(x,n),
+            "RIGHT$": lambda x, n: right(x,n),
+            "LTRIM$": lambda x, what=None: ltrim(x,what),
+            "RTRIM$": lambda x, what=None: rtrim(x,what),
+            "TRIM$": lambda x, what=None: trim(x,what),
+            "ALLTRIM$": lambda x, what=None: alltrim(x,what),
+            "REPEAT$": lambda x, n: repeat(str(x),n),
+            "LIKE": lambda x, pattern: self._basic_boolean(like(x,pattern)),
+            "ILIKE": lambda x, pattern: self._basic_boolean(ilike(x,pattern)),
+            "NUMFORMAT": lambda x, fmt="general": numformat(x,fmt),
+            "DATEFORMAT": lambda x, fmt="date.iso": dateformat(x,fmt),
+            "TEXTFORMAT": lambda x, fmt="text": textformat(x,fmt),
+            "BOOLFORMAT": lambda x, fmt="FALSE|TRUE|UNKNOWN": boolformat(x,fmt),
             "SPACE$": lambda n: " " * int(n),
             "STR$": lambda x: self._basic_string(x),
             "VAL": lambda x: self._val_first_number(x),
@@ -338,17 +352,11 @@ class ExpressionEvaluator:
         };
         if upper == "RND": return self.random.random();
         if upper == "MID$":
-            text = str(args[0]);
-            start = max(1, int(args[1])) - 1;
             length = int(args[2]) if len(args) > 2 else None;
-            return text[start:] if length is None else text[start:start + length];
+            return mid(args[0],args[1],length);
         if upper == "INSTR":
-            if len(args) == 2:
-                start, haystack, needle = 1, str(args[0]), str(args[1]);
-            else:
-                start, haystack, needle = int(args[0]), str(args[1]), str(args[2]);
-            pos = haystack.find(needle, max(0, start - 1));
-            return pos + 1 if pos >= 0 else 0;
+            if len(args) == 2: return instr(args[0],args[1],0);
+            return instr(args[1],args[2],args[0]);
         if upper == "STRING$":
             n = int(args[0]);
             value = args[1];

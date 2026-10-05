@@ -202,3 +202,5 @@ produces the exact decimal value `0.3` internally.
 Invalid mathematical domains, such as an even real root of a negative number or a logarithm outside its real domain, raise a sumBASIC expression error rather than silently returning a fabricated value.
 
 <p align=center><b>- oOo -<b></p>
+
+<p align=center><b>- oOo -</b></p>

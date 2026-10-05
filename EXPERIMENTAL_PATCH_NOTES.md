@@ -15,3 +15,5 @@ Try in a disposable checkout:
     PYTHONPATH=src python3 -m pytest -q tests
 
 No PCM export has been implemented; the audio engine lives in sumcore.audio, not in this archive.
+
+<p align=center><b>- oOo -</b></p>

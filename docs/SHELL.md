@@ -66,3 +66,5 @@ A bare `SHELL` requires a controlling terminal. It intentionally fails when the
 program is being executed only from a non-interactive pipeline.
 
 <p align=center><b>- oOo -<b></p>
+
+<p align=center><b>- oOo -</b></p>

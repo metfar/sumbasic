@@ -24,3 +24,5 @@ The authoritative language parser remains independent of numeric ASC positions. 
 <p align=center><b>- oOo -<b></p>
 
 `PLAY` itself keeps its historical shared-table position `616`. `ZXPLAY` and `GWPLAY` are explicit modern dialect names appended in 0.1.0a14. Versions 0.1.0a15 and 0.1.0a16 do not change ASC indices.
+
+<p align=center><b>- oOo -</b></p>
