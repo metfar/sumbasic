@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.32
+Version: 0.2.37
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -10,7 +10,7 @@ Classifier: Topic :: Education
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: sumcore>=0.1.0a10
+Requires-Dist: sumcore>=0.1.0a21
 Requires-Dist: sumui>=0.1.0a13
 Requires-Dist: sumtui>=0.8.0a17
 Requires-Dist: sumide>=0.2.20
@@ -26,7 +26,7 @@ Provides-Extra: charts
 Requires-Dist: sumgui[charts]>=0.2.0a20; extra == "charts"
 Dynamic: license-file
 
-# sumBASIC 0.2.1
+# sumBASIC 0.2.37
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -232,7 +232,7 @@ If execution reaches the BASIC statement `STOP`, it is **suspended**, not aborte
 
 For direct command-line execution, `--run` places an interactive POSIX terminal in cbreak mode while BASIC is running so `INKEY$` receives keystrokes immediately rather than waiting for a newline. The original terminal settings are restored on normal exit and exceptions. If a BASIC `INPUT` statement is encountered, sumBASIC temporarily restores ordinary cooked/echo mode for line editing and then returns to immediate-key mode. Windows uses the corresponding non-blocking console-key API.
 
-Programs that require interactive `INPUT` should currently be run from the sumBASIC console; source-IDE modal input is a separate frontend milestone.
+`INPUT` also works while a program is running from the source IDE: the IDE temporarily releases the controlling terminal for normal line editing, then restores the TUI/GUI application when input is complete.
 
 ## Command-line source and Unix pipelines
 
@@ -621,5 +621,22 @@ demo uses `PLAY HOLD 0` and stops immediately on graphical/Kitty `KEYUP$` or
 mouse/touch release. On legacy TTYs, typematic repeats act as a heartbeat: after
 an initial grace period, three polling windows without the held key are treated
 as release.
+
+
+## Coloured text output (0.2.35)
+
+ANSI SGR colours are represented as display attributes, not printed escape sequences. The BASIC IDE preserves colours in its F5 output screen and respects LOCATE overwrites.
+
+## Zero-based shared string functions
+
+sumBASIC deliberately indexes arrays and strings from zero. `MID$(text,0,1)` returns the first character and `INSTR` returns a zero-based position or `-1` when no match exists. `REPEAT$`, extended trims, `LIKE`/`ILIKE`, and the shared formatting functions are provided by `sumcore`.
+
+```basic
+PRINT MID$("abcdef", 0, 1)
+PRINT INSTR("abcdef", "cd")
+PRINT REPEAT$("ab", 3)
+PRINT NUMFORMAT(5, "$ 0000.00")
+PRINT BOOLFORMAT(NULL, "NO|SI|OMITIDO")
+```
 
 <p align=center><b>- oOo -</b></p>

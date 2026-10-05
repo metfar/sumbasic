@@ -26,6 +26,7 @@ The editor/workspace/preferences implementation lives in :mod:`sumide`.  This
 module deliberately keeps only BASIC-specific execution services so old
 ``SumBasicIDE`` imports continue to work without reviving a second IDE.
 """;
+import builtins;
 import queue;
 import re;
 import threading;
@@ -260,7 +261,8 @@ class SumBasicIDE(ScriptIDE):
         return self.basic_interpreter.set_program_args(args);
 
     def _ide_input(self, prompt=""):
-        raise BasicError("Interactive INPUT from the source IDE is not implemented yet; run this program in the sumBASIC console for interactive input");
+        """Temporarily hand the terminal to normal line input while a BASIC program runs.""";
+        return (self.app.run_external(lambda: builtins.input(str(prompt))));
 
     def _ide_inkey(self):
         try:

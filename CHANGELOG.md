@@ -1,3 +1,7 @@
+## 0.2.37
+
+- Interactive `INPUT` now works while BASIC programs run from the source IDE by temporarily releasing the controlling terminal for normal line input.
+
 ## 0.2.32
 
 - File channels now open regular files through `sumFSA` + `sumIO`.

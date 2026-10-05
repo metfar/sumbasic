@@ -1,4 +1,4 @@
-# sumBASIC 0.2.36
+# sumBASIC 0.2.37
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 
@@ -204,7 +204,7 @@ If execution reaches the BASIC statement `STOP`, it is **suspended**, not aborte
 
 For direct command-line execution, `--run` places an interactive POSIX terminal in cbreak mode while BASIC is running so `INKEY$` receives keystrokes immediately rather than waiting for a newline. The original terminal settings are restored on normal exit and exceptions. If a BASIC `INPUT` statement is encountered, sumBASIC temporarily restores ordinary cooked/echo mode for line editing and then returns to immediate-key mode. Windows uses the corresponding non-blocking console-key API.
 
-Programs that require interactive `INPUT` should currently be run from the sumBASIC console; source-IDE modal input is a separate frontend milestone.
+`INPUT` also works while a program is running from the source IDE: the IDE temporarily releases the controlling terminal for normal line editing, then restores the TUI/GUI application when input is complete.
 
 ## Command-line source and Unix pipelines
 
