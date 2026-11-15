@@ -1,4 +1,4 @@
-# SUM CLI migration — sumbasic 0.2.38
+# SUM CLI migration — sumbasic 0.2.39
 
 The command-line entry points in this local development snapshot adopt the
 `sumui.cli.SumArgumentParser` contract where appropriate, retaining historical
