@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sumbasic
-Version: 0.2.37
+Version: 0.2.38
 Summary: Educational BASIC interpreter and Sum ecosystem frontend.
 Author-email: William Martinez Bas <metfar@gmail.com>
 License-Expression: GPL-2.0-or-later
@@ -26,7 +26,7 @@ Provides-Extra: charts
 Requires-Dist: sumgui[charts]>=0.2.0a20; extra == "charts"
 Dynamic: license-file
 
-# sumBASIC 0.2.37
+# sumBASIC 0.2.38
 
 sumBASIC is an educational BASIC frontend for the Sum ecosystem. It keeps classic BASIC ideas available while deliberately modernizing the language so it can also be used to learn contemporary programming concepts.
 

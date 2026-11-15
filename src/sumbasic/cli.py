@@ -5,6 +5,7 @@
 #  Copyright 2018- William Martinez Bas <metfar@gmail.com>
 #  
 import argparse;
+from sumui.cli import SumArgumentParser;
 import sys;
 from pathlib import Path;
 
@@ -122,7 +123,7 @@ def _check_loaded(interpreter, label):
     return 0;
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="sumbasic", description="Educational console BASIC for the Sum ecosystem.");
+    parser = SumArgumentParser(prog="sumbasic", description="Educational console BASIC for the Sum ecosystem.");
     parser.add_argument("file", nargs="?", help="BASIC source file; opens in the sumBASIC IDE unless --run/--check is used");
     parser.add_argument("program_args", nargs=argparse.REMAINDER, help="arguments after FILE passed to COMMAND$/ARGS$/ARGV$() inside BASIC");
     parser.add_argument("-c", "--command", dest="command", help="execute BASIC source supplied directly on the command line");

@@ -11,11 +11,12 @@
 #
 """Prepare a portable Sum BASIC project without depending on sumbuild.""";
 import argparse;
+from sumui.cli import SumArgumentParser;
 import json;
 from pathlib import Path;
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(prog="makeBasic");
+    parser=SumArgumentParser(prog="makeBasic");
     parser.add_argument("source", help="BASIC file");
     parser.add_argument("--output", help="project directory (defaults to source's parent)");
     parser.add_argument("--name");
